@@ -53,6 +53,7 @@ services:
     name: stockradar-redis
     plan: free
     maxmemoryPolicy: allkeys-lru
+    ipAllowList: []
 
   # ── Background Worker (Scheduler) ───────────────────────────────────────────
   - type: worker
