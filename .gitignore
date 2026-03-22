@@ -49,3 +49,6 @@ test_fundamental.py
 list_models.py
 create_profile.py
 setup_check.py
+# temp scripts  
+gitcommit.bat  
+DEPLOY_GUIDE.bat 
