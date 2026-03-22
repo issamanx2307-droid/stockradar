@@ -1,0 +1,85 @@
+services:
+  # ── Django / Daphne (ASGI) ──────────────────────────────────────────────────
+  - type: web
+    name: stockradar-api
+    runtime: python
+    buildCommand: |
+      pip install -r requirements.txt &&
+      python manage.py collectstatic --noinput &&
+      python manage.py migrate --noinput
+    startCommand: daphne -b 0.0.0.0 -p $PORT stockradar.asgi:application
+    envVars:
+      - key: DJANGO_SECRET_KEY
+        generateValue: true
+      - key: DEBUG
+        value: "False"
+      - key: ALLOWED_HOSTS
+        value: ".onrender.com,localhost"
+      - key: CORS_ORIGINS
+        value: "https://stockradar-ui.onrender.com"
+      - key: DATABASE_URL
+        fromDatabase:
+          name: stockradar-db
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          name: stockradar-redis
+          type: redis
+          property: connectionString
+      - key: PYTHONIOENCODING
+        value: "utf-8"
+      - key: PYTHONUTF8
+        value: "1"
+    healthCheckPath: /api/dashboard/
+    autoDeploy: true
+
+  # ── React Frontend (Static Site) ────────────────────────────────────────────
+  - type: web
+    name: stockradar-ui
+    runtime: static
+    buildCommand: cd frontend && npm ci && npm run build
+    staticPublishPath: frontend/dist
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    envVars:
+      - key: VITE_API_URL
+        value: https://stockradar-api.onrender.com/api
+    autoDeploy: true
+
+  # ── Redis ────────────────────────────────────────────────────────────────────
+  - type: redis
+    name: stockradar-redis
+    plan: free
+    maxmemoryPolicy: allkeys-lru
+
+  # ── Background Worker (Scheduler) ───────────────────────────────────────────
+  - type: worker
+    name: stockradar-scheduler
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: python manage.py start_scheduler
+    envVars:
+      - key: DJANGO_SECRET_KEY
+        fromService:
+          name: stockradar-api
+          type: web
+          envVarKey: DJANGO_SECRET_KEY
+      - key: DEBUG
+        value: "False"
+      - key: DATABASE_URL
+        fromDatabase:
+          name: stockradar-db
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          name: stockradar-redis
+          type: redis
+          property: connectionString
+
+databases:
+  - name: stockradar-db
+    plan: free
+    databaseName: stockradar
+    user: stockradar

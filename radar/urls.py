@@ -1,0 +1,41 @@
+"""
+URL Routes สำหรับ Radar หุ้น API
+"""
+
+from django.urls import path
+from . import views
+
+urlpatterns = [
+    path("dashboard/",               views.dashboard_summary,            name="dashboard"),
+    path("profile/",                 views.user_profile,                 name="profile"),
+    path("business-profile/",        views.business_profile_api,         name="business-profile"),
+    path("term/",                    views.term_lookup,                  name="term-lookup"),
+    path("terms/search/",            views.term_search,                  name="term-search"),
+    path("terms/featured/",          views.featured_terms,               name="term-featured"),
+    path("qa/ask/",                  views.qa_ask,                       name="qa-ask"),
+    path("position/analyze/",        views.position_analyze_api,         name="position-analyze"),
+    path("symbols/",                 views.SymbolListView.as_view(),      name="symbol-list"),
+    path("prices/<str:symbol>/",     views.PriceListView.as_view(),       name="price-list"),
+    path("indicators/<str:symbol>/", views.IndicatorListView.as_view(),   name="indicator-list"),
+    path("signals/",                 views.SignalListView.as_view(),       name="signal-list"),
+    path("scanner/",                 views.scanner_view,                   name="scanner"),
+    path("scanner/run/",             views.run_scanner_api,                name="scanner-run"),
+    path("backtest/",                views.run_backtest_api,               name="backtest"),
+    path("cache/stats/",             views.cache_stats,                    name="cache-stats"),
+    path("cache/warmup/",            views.cache_warmup,                   name="cache-warmup"),
+    path("cache/invalidate/",        views.cache_invalidate,               name="cache-invalidate"),
+    path("news/",                    views.news_list,                      name="news-list"),
+    path("news/fetch/",              views.news_fetch,                     name="news-fetch"),
+    path("news/sentiment/",          views.news_sentiment_summary,         name="news-sentiment"),
+    # ── Watchlist & Personal Portfolio ──
+    path("watchlist/",                          views.watchlist_list,            name="watchlist-list"),
+    path("watchlist/add/",                      views.watchlist_add_item,        name="watchlist-add"),
+    path("watchlist/item/<int:item_id>/",       views.watchlist_remove_item,     name="watchlist-remove"),
+    path("watchlist/item/<int:item_id>/trade/", views.watchlist_add_trade,       name="watchlist-trade"),
+    path("watchlist/item/<int:item_id>/calc-sell/", views.watchlist_calc_sell,   name="watchlist-calc"),
+    path("watchlist/item/<int:item_id>/alert/", views.watchlist_update_alert,    name="watchlist-alert"),
+    path("watchlist/history/",                  views.watchlist_portfolio_history, name="watchlist-history"),
+    # ── Fundamental Data ──
+    path("fundamental/batch/",         views.fundamental_batch,  name="fundamental-batch"),
+    path("fundamental/<str:symbol>/",  views.fundamental_data,   name="fundamental"),
+]

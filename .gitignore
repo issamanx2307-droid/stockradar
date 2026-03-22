@@ -1,0 +1,51 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+.eggs/
+*.egg
+pip-wheel-metadata/
+.pytest_cache/
+.mypy_cache/
+
+# Django
+*.log
+local_settings.py
+db.sqlite3
+db.sqlite3-journal
+media/
+staticfiles/
+.env
+
+# Virtual env
+.venv/
+venv/
+ENV/
+env/
+
+# Node / Frontend
+frontend/node_modules/
+frontend/dist/
+frontend/.env
+*.lock
+
+# OS
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+
+# Temp
+logs/*.tmp
+logs/*.log
+*.tmp
+check_api.py
+test_fundamental.py
+list_models.py
+create_profile.py
+setup_check.py
