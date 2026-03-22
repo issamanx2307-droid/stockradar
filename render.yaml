@@ -1,12 +1,10 @@
 services:
-  # ── Django / Daphne (ASGI) ──────────────────────────────────────────────────
+  # ── Django / Daphne (ASGI) — Free tier ─────────────────────────────────────
   - type: web
     name: stockradar-api
     runtime: python
-    buildCommand: |
-      pip install -r requirements.txt &&
-      python manage.py collectstatic --noinput &&
-      python manage.py migrate --noinput
+    plan: free
+    buildCommand: pip install -r requirements.txt && python manage.py collectstatic --noinput && python manage.py migrate --noinput
     startCommand: daphne -b 0.0.0.0 -p $PORT stockradar.asgi:application
     envVars:
       - key: DJANGO_SECRET_KEY
@@ -30,13 +28,16 @@ services:
         value: "utf-8"
       - key: PYTHONUTF8
         value: "1"
+      - key: RUN_SCHEDULER
+        value: "true"
     healthCheckPath: /api/dashboard/
     autoDeploy: true
 
-  # ── React Frontend (Static Site) ────────────────────────────────────────────
+  # ── React Frontend — Static Site (ฟรี) ─────────────────────────────────────
   - type: web
     name: stockradar-ui
     runtime: static
+    plan: free
     buildCommand: cd frontend && npm ci && npm run build
     staticPublishPath: frontend/dist
     routes:
@@ -48,38 +49,15 @@ services:
         value: https://stockradar-api.onrender.com/api
     autoDeploy: true
 
-  # ── Redis ────────────────────────────────────────────────────────────────────
+  # ── Redis — Free tier ────────────────────────────────────────────────────────
   - type: redis
     name: stockradar-redis
     plan: free
     maxmemoryPolicy: allkeys-lru
     ipAllowList: []
 
-  # ── Background Worker (Scheduler) ───────────────────────────────────────────
-  - type: worker
-    name: stockradar-scheduler
-    runtime: python
-    buildCommand: pip install -r requirements.txt
-    startCommand: python manage.py start_scheduler
-    envVars:
-      - key: DJANGO_SECRET_KEY
-        fromService:
-          name: stockradar-api
-          type: web
-          envVarKey: DJANGO_SECRET_KEY
-      - key: DEBUG
-        value: "False"
-      - key: DATABASE_URL
-        fromDatabase:
-          name: stockradar-db
-          property: connectionString
-      - key: REDIS_URL
-        fromService:
-          name: stockradar-redis
-          type: redis
-          property: connectionString
-
 databases:
+  # ── PostgreSQL — Free tier (ใช้ได้ 90 วัน จากนั้น $7/mo หรือ migrate) ───────
   - name: stockradar-db
     plan: free
     databaseName: stockradar
