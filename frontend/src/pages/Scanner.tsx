@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react"
 import { api } from "../api/client"
 import { ScannerResult } from "../api/types"
 import { TermText } from "../components/TermAssistant"
+import SymbolInput from "../components/SymbolInput"
 
 const SIG_LABEL: Record<string, string> = {
   GOLDEN_CROSS: "Golden✕", EMA_ALIGNMENT: "EMA Align", EMA_PULLBACK: "EMA Pull",
@@ -220,8 +221,10 @@ export default function Scanner({ onOpenChart }: { onOpenChart: (s: string) => v
                     <button className="btn btn-ghost" style={{ padding: '0 10px' }} onClick={() => { setCustomFormula(false); setFormula(""); }}>✕</button>
                   </div>
                 )}
-                <input className="filter-input" style={{ width: "100%" }} placeholder="🔍 ค้นหาชื่อหุ้น หรือรหัส..."
-                  value={search} onChange={e => setSearch(e.target.value)} />
+                <SymbolInput
+                  value={search} onChange={setSearch}
+                  placeholder="🔍 ค้นหาชื่อหุ้น หรือรหัส..."
+                  style={{ width: "100%" }} />
               </div>
             </div>
 

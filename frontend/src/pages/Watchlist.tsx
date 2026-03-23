@@ -3,6 +3,7 @@
  * ใส่ราคาซื้อ+จำนวนได้ไม่จำกัดครั้ง → คำนวณต้นทุนเฉลี่ย + วิเคราะห์ + แนะนำ
  */
 import { useState, useEffect, useCallback, useRef } from "react"
+import SymbolInput from "../components/SymbolInput"
 
 const BASE = "http://127.0.0.1:8000/api"
 
@@ -191,12 +192,13 @@ export default function Watchlist({ onOpenChart }: { onOpenChart?: (s: string) =
         <div className="card" style={{ marginBottom:16 }}>
           <div className="card-title">➕ เพิ่มหุ้ว ({items.length}/10)</div>
           <div style={{ display:"flex", gap:10, alignItems:"center" }}>
-            <input className="filter-input" placeholder="รหัสหุ้น เช่น PTT, AAPL..."
-              value={addSymbol} onChange={e => setAddSymbol(e.target.value.toUpperCase())}
-              onKeyDown={e => e.key==="Enter" && handleAdd()}
-              style={{ flex:1, fontFamily:"var(--font-mono)", fontWeight:700, fontSize:14 }} />
+            <SymbolInput
+              value={addSymbol} onChange={setAddSymbol}
+              onSelect={() => handleAdd()}
+              placeholder="รหัสหุ้น เช่น PTT, KBANK, AAPL..."
+              style={{ flex:1 }} />
             <button className="btn btn-primary" onClick={handleAdd}
-              disabled={addLoading || items.length >= 10} style={{ minWidth:100 }}>
+              disabled={addLoading || items.length >= 10} style={{ minWidth:100, flexShrink:0 }}>
               {addLoading ? "⏳..." : "เพิ่ม"}
             </button>
           </div>

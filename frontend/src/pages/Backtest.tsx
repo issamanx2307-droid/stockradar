@@ -1,6 +1,7 @@
 import { useState, useRef } from "react"
 import { api } from "../api/client"
 import { TermText } from "../components/TermAssistant"
+import SymbolInput from "../components/SymbolInput"
 
 // ─── interfaces ──────────────────────────────────────────────────────────────
 
@@ -448,12 +449,10 @@ export default function Backtest() {
               <label style={{ fontSize: 11, color: "var(--text-muted)", display: "block", marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.06em" }}>
                 รหัสหุ้น *
               </label>
-              <input className="filter-input" style={{ width: "100%", fontFamily: "var(--font-mono)", fontWeight: 700, fontSize: 15 }}
-                placeholder="เช่น PTT, KBANK"
-                value={symbol}
-                onChange={e => setSymbol(e.target.value.toUpperCase())}
-                onKeyDown={e => e.key === "Enter" && handleRun()}
-              />
+              <SymbolInput
+                value={symbol} onChange={setSymbol} onSelect={handleRun}
+                placeholder="เช่น PTT, KBANK, AAPL..."
+                style={{ width: "100%" }} />
             </div>
 
             <div>

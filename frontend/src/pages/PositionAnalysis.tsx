@@ -1,5 +1,6 @@
 import { useState } from "react"
 import { api } from "../api/client"
+import SymbolInput from "../components/SymbolInput"
 
 type PositionAnalysisResponse = {
   symbol: string
@@ -89,13 +90,10 @@ export default function PositionAnalysis() {
       <div className="page-body">
         <div className="card" style={{ marginBottom: 16 }}>
           <div className="filters" style={{ gap: 10, flexWrap: "wrap" }}>
-            <input
-              className="filter-input"
+            <SymbolInput
+              value={symbol} onChange={setSymbol} onSelect={() => {}}
               placeholder="Symbol เช่น PTT, AAPL"
-              value={symbol}
-              onChange={e => setSymbol(e.target.value.toUpperCase())}
-              style={{ width: 180, fontFamily: "var(--font-mono)", fontWeight: 700 }}
-            />
+              style={{ width: 220 }} />
             <input
               className="filter-input"
               placeholder="ราคาเข้าซื้อ"

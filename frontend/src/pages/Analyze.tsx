@@ -7,6 +7,7 @@ import { useState } from "react"
 import { engineApi, EngineResult } from "../api/engineApi"
 import DecisionBadge from "../components/DecisionBadge"
 import ScoreCard from "../components/ScoreCard"
+import SymbolInput from "../components/SymbolInput"
 
 const BREAKDOWN_CONFIG = [
   { key: "trend",      label: "📈 Trend",      max: 40, color: "#00d4ff" },
@@ -49,10 +50,9 @@ export default function Analyze({ onOpenChart }: { onOpenChart?: (s: string) => 
           <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "flex-end" }}>
             <div style={{ flex: 1, minWidth: 180 }}>
               <div style={{ fontSize: 11, color: "var(--text-muted)", marginBottom: 4 }}>รหัสหุ้น</div>
-              <input className="filter-input" placeholder="PTT, KBANK, AAPL..."
-                value={symbol} onChange={e => setSymbol(e.target.value.toUpperCase())}
-                onKeyDown={e => e.key === "Enter" && handleAnalyze()}
-                style={{ width: "100%", fontFamily: "var(--font-mono)", fontWeight: 700 }} />
+              <SymbolInput
+                value={symbol} onChange={setSymbol} onSelect={handleAnalyze}
+                placeholder="PTT, KBANK, AAPL..." />
             </div>
             <div style={{ minWidth: 160 }}>
               <div style={{ fontSize: 11, color: "var(--text-muted)", marginBottom: 4 }}>เงินทุน (บาท)</div>

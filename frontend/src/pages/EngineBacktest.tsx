@@ -5,6 +5,7 @@
 import { useState, useEffect, useRef } from "react"
 import { engineApi, BacktestResult } from "../api/engineApi"
 import { createChart, LineSeries } from "lightweight-charts"
+import SymbolInput from "../components/SymbolInput"
 
 function EquityChart({ equity }: { equity: number[] }) {
   const ref = useRef<HTMLDivElement>(null)
@@ -70,10 +71,10 @@ export default function EngineBacktest({ onOpenChart }: { onOpenChart?: (s: stri
           <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "flex-end" }}>
             <div>
               <div style={{ fontSize: 11, color: "var(--text-muted)", marginBottom: 4 }}>รหัสหุ้น</div>
-              <input className="filter-input" placeholder="PTT, AAPL..." value={symbol}
-                onChange={e => setSymbol(e.target.value.toUpperCase())}
-                onKeyDown={e => e.key === "Enter" && handleRun()}
-                style={{ width: 120, fontFamily: "var(--font-mono)", fontWeight: 700 }} />
+              <SymbolInput
+                value={symbol} onChange={setSymbol} onSelect={handleRun}
+                placeholder="PTT, AAPL..."
+                style={{ width: 160 }} />
             </div>
             <div>
               <div style={{ fontSize: 11, color: "var(--text-muted)", marginBottom: 4 }}>เงินทุน</div>

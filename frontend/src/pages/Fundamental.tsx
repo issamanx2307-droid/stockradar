@@ -3,6 +3,7 @@
  * ข้อมูล Fundamental — P/E, EPS, งบการเงิน, Analyst Consensus
  */
 import { useState, useCallback } from "react"
+import SymbolInput from "../components/SymbolInput"
 
 const BASE = "http://127.0.0.1:8000/api"
 
@@ -205,10 +206,11 @@ export default function Fundamental({ onOpenChart }: { onOpenChart?: (s: string)
         {/* Search */}
         <div className="card" style={{ marginBottom:20 }}>
           <div style={{ display:"flex", gap:10, alignItems:"center" }}>
-            <input className="filter-input" placeholder="รหัสหุ้น — PTT, KBANK, AAPL..."
-              value={symbol} onChange={e => setSymbol(e.target.value.toUpperCase())}
-              onKeyDown={e => e.key==="Enter" && load(symbol)}
-              style={{ flex:1, fontFamily:"var(--font-mono)", fontWeight:700, fontSize:16 }} />
+            <SymbolInput
+              value={symbol} onChange={setSymbol}
+              onSelect={s => load(s)}
+              placeholder="รหัสหุ้น — PTT, KBANK, AAPL..."
+              style={{ flex:1 }} />
             <button className="btn btn-primary" onClick={() => load(symbol)}
               disabled={loading} style={{ minWidth:120, height:40 }}>
               {loading ? "⏳ กำลังโหลด..." : "🔍 ค้นหา"}
