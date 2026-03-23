@@ -5,7 +5,7 @@
 import { useState, useEffect, useCallback, useRef } from "react"
 import SymbolInput from "../components/SymbolInput"
 
-const BASE = "http://127.0.0.1:8000/api"
+const BASE = (import.meta as any).env.VITE_API_URL || "http://127.0.0.1:8000/api"
 
 type Trade = { id: number; action: string; price: number; quantity: number; trade_date: string; note: string }
 type Item  = {
@@ -36,6 +36,156 @@ function thb(v: number) {
   return `฿${v.toLocaleString("th-TH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 }
 
+// ── P/L History Chart (SVG) ──────────────────────────────────────────────────
+type HistPoint = { date: string; market_value: number; invested: number; pnl: number; pnl_pct: number }
+
+function HistoryChart({ days }: { days: number }) {
+  const [data, setData]     = useState<HistPoint[]>([])
+  const [loading, setLoading] = useState(true)
+  const [tooltip, setTooltip] = useState<{ i: number; x: number; y: number } | null>(null)
+  const svgRef = useRef<SVGSVGElement>(null)
+
+  useEffect(() => {
+    setLoading(true)
+    fetch(`${BASE}/watchlist/history/?days=${days}`)
+      .then(r => r.json())
+      .then(d => setData(d.history || []))
+      .catch(console.error)
+      .finally(() => setLoading(false))
+  }, [days])
+
+  if (loading) return <div className="loading-state" style={{ height:240 }}><div className="loading-spinner"/><span>กำลังโหลด...</span></div>
+  if (data.length === 0) return (
+    <div className="empty-state" style={{ height:240 }}>
+      <span style={{ fontSize:40 }}>📈</span>
+      <span style={{ fontWeight:600 }}>ยังไม่มีข้อมูล P/L History</span>
+      <span style={{ fontSize:12, color:"var(--text-muted)" }}>บันทึกการซื้อหุ้นอย่างน้อย 1 รายการเพื่อดูกราฟ</span>
+    </div>
+  )
+
+  const W = 700, H = 220, PAD = { top:16, right:20, bottom:36, left:72 }
+  const iW = W - PAD.left - PAD.right
+  const iH = H - PAD.top  - PAD.bottom
+
+  const values    = data.map(d => d.market_value)
+  const pnlVals   = data.map(d => d.pnl_pct)
+  const minV      = Math.min(...values) * 0.995
+  const maxV      = Math.max(...values) * 1.005
+  const isProfit  = values[values.length-1] >= data[0]?.invested
+  const lineColor = isProfit ? "#00e676" : "#ff5252"
+  const areaColor = isProfit ? "rgba(0,230,118,0.1)" : "rgba(255,82,82,0.08)"
+
+  const xS = (i: number) => PAD.left + (i / Math.max(data.length-1,1)) * iW
+  const yS = (v: number) => PAD.top  + iH - ((v - minV) / Math.max(maxV - minV, 1)) * iH
+
+  const pts     = data.map((d, i) => `${xS(i)},${yS(d.market_value)}`)
+  const linePath = "M" + pts.join("L")
+  const areaPath = linePath + `L${xS(data.length-1)},${PAD.top+iH} L${PAD.left},${PAD.top+iH}Z`
+
+  const invested0 = data[0]?.invested || 0
+  const baseY    = yS(invested0)
+
+  // Y-axis ticks
+  const yTicks = Array.from({ length:5 }, (_, i) => minV + (maxV-minV) * i / 4)
+  // X-axis ticks (5 points)
+  const xTicks = [0, Math.floor(data.length/4), Math.floor(data.length/2), Math.floor(data.length*3/4), data.length-1]
+    .filter(i => i < data.length)
+
+  function onMouseMove(e: React.MouseEvent) {
+    if (!svgRef.current) return
+    const rect = svgRef.current.getBoundingClientRect()
+    const mx   = (e.clientX - rect.left) * (W / rect.width) - PAD.left
+    const i    = Math.max(0, Math.min(data.length-1, Math.round((mx / iW) * (data.length-1))))
+    setTooltip({ i, x: e.clientX - rect.left, y: e.clientY - rect.top })
+  }
+
+  const last   = data[data.length-1]
+  const retPct = last ? last.pnl_pct : 0
+
+  return (
+    <div>
+      {/* Summary row */}
+      <div style={{ display:"flex", gap:24, marginBottom:16, flexWrap:"wrap" }}>
+        {[
+          { label:"มูลค่าล่าสุด",  val: last ? thb(last.market_value) : "—", color:"var(--accent)" },
+          { label:"ต้นทุนรวม",     val: last ? thb(last.invested) : "—",      color:"var(--text-primary)" },
+          { label:"P/L",           val: last ? thb(last.pnl) : "—",           color: last?.pnl >= 0 ? "var(--green)" : "var(--red)" },
+          { label:"ผลตอบแทน",     val: last ? pct(retPct) : "—",             color: retPct >= 0 ? "var(--green)" : "var(--red)" },
+        ].map(({ label, val, color }) => (
+          <div key={label}>
+            <div style={{ fontSize:11, color:"var(--text-muted)" }}>{label}</div>
+            <div style={{ fontSize:18, fontWeight:700, fontFamily:"var(--font-mono)", color }}>{val}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* SVG Chart */}
+      <svg ref={svgRef} viewBox={`0 0 ${W} ${H}`}
+        style={{ width:"100%", height:"auto", cursor:"crosshair" }}
+        onMouseMove={onMouseMove} onMouseLeave={() => setTooltip(null)}>
+
+        <path d={areaPath} fill={areaColor}/>
+        <path d={linePath} fill="none" stroke={lineColor} strokeWidth="1.8"/>
+
+        {/* invested baseline */}
+        {baseY >= PAD.top && baseY <= PAD.top+iH && (
+          <line x1={PAD.left} y1={baseY} x2={PAD.left+iW} y2={baseY}
+            stroke="var(--text-muted)" strokeWidth="0.6" strokeDasharray="4,3"/>
+        )}
+
+        {/* Y ticks */}
+        {yTicks.map((v, i) => (
+          <g key={i}>
+            <line x1={PAD.left-4} y1={yS(v)} x2={PAD.left} y2={yS(v)} stroke="var(--border)" strokeWidth="1"/>
+            <text x={PAD.left-8} y={yS(v)+4} textAnchor="end"
+              style={{ fontSize:9, fill:"var(--text-muted)", fontFamily:"monospace" }}>
+              {v >= 1e6 ? `${(v/1e6).toFixed(1)}M` : v >= 1e3 ? `${(v/1e3).toFixed(0)}K` : v.toFixed(0)}
+            </text>
+          </g>
+        ))}
+
+        {/* X ticks */}
+        {xTicks.map(i => (
+          <text key={i} x={xS(i)} y={H-6} textAnchor="middle"
+            style={{ fontSize:8, fill:"var(--text-muted)", fontFamily:"monospace" }}>
+            {data[i].date.slice(5)}
+          </text>
+        ))}
+
+        {/* Crosshair */}
+        {tooltip && (
+          <g>
+            <line x1={xS(tooltip.i)} y1={PAD.top} x2={xS(tooltip.i)} y2={PAD.top+iH}
+              stroke="var(--accent)" strokeWidth="0.8" strokeDasharray="3,2"/>
+            <circle cx={xS(tooltip.i)} cy={yS(data[tooltip.i].market_value)} r="4"
+              fill={lineColor} stroke="var(--bg-surface)" strokeWidth="1.5"/>
+          </g>
+        )}
+      </svg>
+
+      {/* Tooltip */}
+      {tooltip && data[tooltip.i] && (() => {
+        const d  = data[tooltip.i]
+        const up = d.pnl >= 0
+        return (
+          <div style={{
+            position:"absolute", top: tooltip.y - 90, left: Math.min(tooltip.x+12, 480),
+            background:"var(--bg-elevated)", border:"1px solid var(--border)",
+            borderRadius:8, padding:"8px 12px", fontSize:12, pointerEvents:"none",
+            fontFamily:"monospace", boxShadow:"0 4px 16px rgba(0,0,0,.4)", zIndex:10,
+          }}>
+            <div style={{ color:"var(--text-muted)", marginBottom:4 }}>{d.date}</div>
+            <div style={{ color:"var(--accent)", fontWeight:700 }}>มูลค่า: {thb(d.market_value)}</div>
+            <div style={{ color: up?"var(--green)":"var(--red)", fontWeight:700 }}>
+              P/L: {thb(d.pnl)} ({pct(d.pnl_pct)})
+            </div>
+          </div>
+        )
+      })()}
+    </div>
+  )
+}
+
 export default function Watchlist({ onOpenChart }: { onOpenChart?: (s: string) => void }) {
   const [items, setItems]         = useState<Item[]>([])
   const [summary, setSummary]     = useState<Summary | null>(null)
@@ -51,6 +201,8 @@ export default function Watchlist({ onOpenChart }: { onOpenChart?: (s: string) =
   const [addLoading, setAddLoading] = useState(false)
 
   const [expanded, setExpanded]   = useState<number | null>(null)
+  const [activeTab, setActiveTab] = useState<"portfolio"|"history">("portfolio")
+  const [histDays, setHistDays]   = useState(90)
   const [tradeForm, setTradeForm] = useState<Record<number, { action:string; price:string; qty:string; date:string; note:string }>>({})
   const [calcForm, setCalcForm]   = useState<Record<number, { price:string; qty:string }>>({})
   const [calcResult, setCalcResult] = useState<Record<number, any>>({})
@@ -187,6 +339,45 @@ export default function Watchlist({ onOpenChart }: { onOpenChart?: (s: string) =
             Live price อัปเดตล่าสุด {liveTime} · delay ~15 นาที
           </div>
         )}
+
+        {/* ── Tab Bar ── */}
+        <div style={{ display:"flex", gap:4, marginBottom:20, borderBottom:"1px solid var(--border)", paddingBottom:0 }}>
+          {([
+            { id:"portfolio", label:"⭐ Portfolio", color:"var(--accent)" },
+            { id:"history",   label:"📈 P/L History", color:"var(--green)" },
+          ] as const).map(tab => (
+            <button key={tab.id} onClick={() => setActiveTab(tab.id)} style={{
+              padding:"10px 20px", fontSize:13, fontWeight:700, cursor:"pointer",
+              border:"none", background:"transparent",
+              borderBottom: activeTab===tab.id ? `2px solid ${tab.color}` : "2px solid transparent",
+              color: activeTab===tab.id ? tab.color : "var(--text-muted)",
+              transition:"color 0.15s", marginBottom:-1,
+            }}>{tab.label}</button>
+          ))}
+        </div>
+
+        {/* ── History Tab ── */}
+        {activeTab === "history" && (
+          <div className="card" style={{ position:"relative" }}>
+            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:16 }}>
+              <div className="card-title" style={{ margin:0 }}>📈 Equity Curve — P/L History</div>
+              <div style={{ display:"flex", gap:6 }}>
+                {[30,60,90,180].map(d => (
+                  <button key={d} onClick={() => setHistDays(d)} style={{
+                    padding:"4px 10px", borderRadius:6, fontSize:11, fontWeight:700, cursor:"pointer",
+                    border:`1px solid ${histDays===d?"var(--accent)":"var(--border)"}`,
+                    background: histDays===d ? "var(--accent-dim)" : "transparent",
+                    color: histDays===d ? "var(--accent)" : "var(--text-muted)",
+                  }}>{d}ว</button>
+                ))}
+              </div>
+            </div>
+            <HistoryChart days={histDays} />
+          </div>
+        )}
+
+        {/* ── Portfolio Tab ── */}
+        {activeTab === "portfolio" && (<>
 
         {/* ── Add Stock ── */}
         <div className="card" style={{ marginBottom:16 }}>
@@ -421,6 +612,7 @@ export default function Watchlist({ onOpenChart }: { onOpenChart?: (s: string) =
             })}
           </div>
         )}
+        </>)}
       </div>
     </div>
   )
