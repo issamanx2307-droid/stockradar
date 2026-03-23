@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useState, useRef } from "react"
 import { useRadarWS } from "./hooks/useRadarWS"
 import { WsStatus } from "./components/WsStatus"
 import { ScannerProgress } from "./components/ScannerProgress"
@@ -43,6 +43,7 @@ export default function App() {
   const [page, setPage] = useState("dashboard")
   const [history, setHistory] = useState<string[]>([])
   const [chartSymbol, setChartSymbol] = useState<string | null>(null)
+  const [analyzeSymbol, setAnalyzeSymbol] = useState<string | null>(null)
   const ws = useRadarWS()
 
   function navigateTo(newPage: string) {
@@ -61,6 +62,12 @@ export default function App() {
     setChartSymbol(symbol)
     setHistory(h => [...h, page])
     setPage("chart")
+  }
+
+  function openAnalyze(symbol: string) {
+    setAnalyzeSymbol(symbol)
+    setHistory(h => [...h, page])
+    setPage("analyze")
   }
 
   return (
@@ -103,10 +110,10 @@ export default function App() {
             {page === "engine_scan" && <EngineScan onOpenChart={openChart} />}
             {page === "watchlist"   && <Watchlist onOpenChart={openChart} />}
             {page === "news"        && <News onOpenChart={openChart} />}
-            {page === "analyze"     && <Analyze onOpenChart={openChart} />}
+            {page === "analyze"     && <Analyze onOpenChart={openChart} initialSymbol={analyzeSymbol} />}
             {page === "fundamental" && <Fundamental onOpenChart={openChart} />}
             {page === "portfolio"   && <Portfolio onOpenChart={openChart} />}
-            {page === "scanner"     && <Scanner onOpenChart={openChart} />}
+            {page === "scanner"     && <Scanner onOpenChart={openChart} onAnalyze={openAnalyze} />}
             {page === "chart"       && <Chart symbol={chartSymbol} />}
             {page === "strategy"    && <StrategyBuilder />}
             {page === "backtest"    && <EngineBacktest onOpenChart={openChart} />}

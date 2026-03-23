@@ -3,7 +3,7 @@
  * วิเคราะห์หุ้นเดียวด้วย Engine ใหม่
  * Score breakdown 5 หมวด + reasons + entry/stop/size
  */
-import { useState, useRef } from "react"
+import { useState, useRef, useEffect } from "react"
 import { engineApi, EngineResult } from "../api/engineApi"
 import DecisionBadge from "../components/DecisionBadge"
 import ScoreCard from "../components/ScoreCard"
@@ -16,14 +16,25 @@ const BREAKDOWN_CONFIG = [
   { key: "volatility", label: "⚡ Volatility", max: 10, color: "#ce93d8" },
 ]
 
-export default function Analyze({ onOpenChart }: { onOpenChart?: (s: string) => void }) {
-  const [symbol, setSymbol]   = useState("")
+export default function Analyze({ onOpenChart, initialSymbol }: {
+  onOpenChart?: (s: string) => void
+  initialSymbol?: string | null
+}) {
+  const [symbol, setSymbol]   = useState(initialSymbol || "")
   const [capital, setCapital] = useState(100000)
   const [data, setData]       = useState<EngineResult | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError]     = useState("")
   // ref เก็บค่า symbol ล่าสุดเสมอ — แก้ closure bug ใน onSelect
-  const symRef = useRef("")
+  const symRef = useRef(initialSymbol || "")
+
+  // ถ้ามี initialSymbol → วิเคราะห์ทันที
+  useEffect(() => {
+    if (initialSymbol) {
+      symRef.current = initialSymbol
+      handleAnalyze(initialSymbol)
+    }
+  }, [])
 
   function handleSymbolChange(v: string) {
     setSymbol(v)

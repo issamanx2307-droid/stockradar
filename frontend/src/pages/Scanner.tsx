@@ -94,7 +94,10 @@ function FilterBadges({ vol, atr, adx }: { vol?: boolean; atr?: boolean; adx?: b
   )
 }
 
-export default function Scanner({ onOpenChart }: { onOpenChart: (s: string) => void }) {
+export default function Scanner({ onOpenChart, onAnalyze }: {
+  onOpenChart: (s: string) => void
+  onAnalyze?: (s: string) => void
+}) {
   const [rows, setRows] = useState<ScannerResult[]>([])
   const [loading, setLoading] = useState(false)
   const [running, setRunning] = useState(false)
@@ -319,11 +322,12 @@ export default function Scanner({ onOpenChart }: { onOpenChart: (s: string) => v
                           <th style={{ textAlign: "right" }}>Stop Loss</th>
                           <th style={{ minWidth: 140 }}>ความแข็งแกร่ง (Score)</th>
                           <th style={{ paddingRight: 24 }}>ตัวกรอง</th>
+                          <th style={{ paddingRight: 16, textAlign:"center" }}>Actions</th>
                         </tr>
                       </thead>
                       <tbody>
                         {filtered.map((r, i) => (
-                          <tr key={i} onClick={() => onOpenChart(r.symbol)} style={{ cursor: "pointer" }}>
+                          <tr key={i} style={{ cursor:"default" }}>
                             <td style={{ paddingLeft: 24 }}>
                               <div className="symbol-cell">
                                 <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
@@ -363,6 +367,34 @@ export default function Scanner({ onOpenChart }: { onOpenChart: (s: string) => v
                             <td style={{ paddingRight: 24 }}>
                               {/* @ts-ignore */}
                               <FilterBadges vol={r.filter_volume} atr={r.filter_volatility} adx={r.filter_adx} />
+                            </td>
+                            <td style={{ paddingRight: 16 }}>
+                              <div style={{ display:"flex", gap:6, justifyContent:"center" }}>
+                                <button
+                                  onClick={e => { e.stopPropagation(); onAnalyze?.(r.symbol) }}
+                                  title={`วิเคราะห์ ${r.symbol}`}
+                                  style={{
+                                    padding:"4px 10px", borderRadius:6, fontSize:11, fontWeight:700,
+                                    cursor:"pointer", border:"1px solid var(--accent)",
+                                    background:"var(--accent-dim)", color:"var(--accent)",
+                                    whiteSpace:"nowrap", transition:"all .15s",
+                                  }}
+                                  onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background="var(--accent)"; (e.currentTarget as HTMLElement).style.color="#000" }}
+                                  onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background="var(--accent-dim)"; (e.currentTarget as HTMLElement).style.color="var(--accent)" }}
+                                >🔬 วิเคราะห์</button>
+                                <button
+                                  onClick={e => { e.stopPropagation(); onOpenChart(r.symbol) }}
+                                  title={`กราฟ ${r.symbol}`}
+                                  style={{
+                                    padding:"4px 10px", borderRadius:6, fontSize:11, fontWeight:700,
+                                    cursor:"pointer", border:"1px solid var(--border)",
+                                    background:"transparent", color:"var(--text-muted)",
+                                    whiteSpace:"nowrap", transition:"all .15s",
+                                  }}
+                                  onMouseEnter={e => { (e.currentTarget as HTMLElement).style.borderColor="var(--text-muted)"; (e.currentTarget as HTMLElement).style.color="var(--text-primary)" }}
+                                  onMouseLeave={e => { (e.currentTarget as HTMLElement).style.borderColor="var(--border)"; (e.currentTarget as HTMLElement).style.color="var(--text-muted)" }}
+                                >📈 กราฟ</button>
+                              </div>
                             </td>
                           </tr>
                         ))}
