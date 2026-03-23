@@ -1080,276 +1080,6 @@ def watchlist_calc_sell(request, item_id):
         "label":            "กำไร" if gross_pnl >= 0 else "ขาดทุน",
     })
 
-# ─── Watchlist API ────────────────────────────────────────────────────────────
-
-def _get_session(request) -> str:
-    """ดึง session key สำหรับ anonymous user"""
-    sid = request.query_params.get("sid") or request.data.get("sid", "")
-    if not sid:
-        sid = request.session.session_key or "anonymous"
-    return sid[:64]
-
-
-def _latest_price(symbol_obj) -> float | None:
-    """ราคาปิดล่าสุดจาก DB"""
-    p = PriceDaily.objects.filter(symbol=symbol_obj).order_by("-date").first()
-    return float(p.close) if p else None
-
-
-def _latest_indicator(symbol_obj) -> dict:
-    from radar.models import Indicator
-    ind = Indicator.objects.filter(symbol=symbol_obj).order_by("-date").first()
-    if not ind:
-        return {}
-    return {
-        "rsi":   float(ind.rsi)   if ind.rsi   else None,
-        "adx14": float(ind.adx14) if ind.adx14 else None,
-        "ema20": float(ind.ema20) if ind.ema20 else None,
-        "ema50": float(ind.ema50) if ind.ema50 else None,
-        "ema200":float(ind.ema200) if ind.ema200 else None,
-        "atr14": float(ind.atr14) if ind.atr14 else None,
-    }
-
-
-def _analyze_position(avg_cost: float, total_qty: float, current_price: float,
-                      total_invested: float, ind: dict) -> dict:
-    """วิเคราะห์สถานะและให้คำแนะนำ"""
-    if not current_price or not avg_cost:
-        return {}
-
-    pnl        = (current_price - avg_cost) * total_qty
-    pnl_pct    = (current_price - avg_cost) / avg_cost * 100
-    mkt_value  = current_price * total_qty
-
-    # ATR-based stop loss (1.5x ATR ใต้ราคาปัจจุบัน)
-    atr = ind.get("atr14") or avg_cost * 0.05
-    stop_loss  = round(current_price - 1.5 * atr, 4)
-    stop_loss  = max(stop_loss, avg_cost * 0.85)  # ไม่เกิน -15% จากต้นทุน
-
-    # Target price (2:1 risk/reward)
-    risk       = current_price - stop_loss
-    target     = round(current_price + 2 * risk, 4)
-
-    # สถานะ
-    if pnl_pct >= 20:
-        status = "STRONG_PROFIT"
-        status_th = "กำไรมาก — พิจารณาขายบางส่วน"
-    elif pnl_pct >= 5:
-        status = "PROFIT"
-        status_th = "กำไร — ถือต่อหรือ Trailing Stop"
-    elif pnl_pct >= -5:
-        status = "BREAKEVEN"
-        status_th = "ใกล้ทุน — เฝ้าดู"
-    elif pnl_pct >= -15:
-        status = "LOSS"
-        status_th = "ขาดทุน — พิจารณา Cut Loss"
-    else:
-        status = "DEEP_LOSS"
-        status_th = "ขาดทุนมาก — ควร Cut Loss"
-
-    # buy more zone: ถ้า RSI < 40 และราคา > EMA200
-    rsi   = ind.get("rsi")
-    ema200= ind.get("ema200")
-    ema50 = ind.get("ema50")
-    buy_more_zone = None
-    if rsi and ema200 and current_price > ema200 and rsi < 45:
-        buy_more_zone = round(ema50 * 0.97 if ema50 else current_price * 0.95, 4)
-
-    return {
-        "pnl":           round(pnl, 2),
-        "pnl_pct":       round(pnl_pct, 2),
-        "market_value":  round(mkt_value, 2),
-        "total_invested":round(total_invested, 2),
-        "stop_loss":     stop_loss,
-        "target_price":  target,
-        "risk_reward":   "2:1",
-        "buy_more_zone": buy_more_zone,
-        "status":        status,
-        "status_th":     status_th,
-    }
-
-
-@api_view(["GET"])
-def watchlist_list(request):
-    """GET /api/watchlist/?sid=xxx — รายการ watchlist พร้อมวิเคราะห์"""
-    from radar.models import WatchlistItem
-    sid = _get_session(request)
-    items = WatchlistItem.objects.filter(user_session=sid).select_related("symbol").prefetch_related("transactions")
-
-    results = []
-    for item in items:
-        sym = item.symbol
-        current_price = _latest_price(sym)
-        ind = _latest_indicator(sym)
-        avg = item.avg_cost
-        qty = item.total_quantity
-        inv = item.total_invested
-
-        analysis = _analyze_position(avg, qty, current_price or 0, inv, ind) if current_price else {}
-
-        txs = [{"id": t.id, "buy_price": float(t.buy_price),
-                "quantity": float(t.quantity), "date": str(t.date), "note": t.note}
-               for t in item.transactions.all()]
-
-        results.append({
-            "id":            item.id,
-            "symbol":        sym.symbol,
-            "name":          sym.name,
-            "exchange":      sym.exchange,
-            "avg_cost":      round(avg, 4),
-            "total_quantity":round(qty, 2),
-            "total_invested":round(inv, 2),
-            "current_price": current_price,
-            "alert_high":    float(item.alert_high) if item.alert_high else None,
-            "alert_low":     float(item.alert_low)  if item.alert_low  else None,
-            "note":          item.note,
-            "transactions":  txs,
-            "indicator":     ind,
-            "analysis":      analysis,
-        })
-    return Response({"count": len(results), "results": results})
-
-
-@api_view(["POST"])
-def watchlist_add(request):
-    """POST /api/watchlist/add/ — เพิ่มหุ้นเข้า watchlist"""
-    from radar.models import WatchlistItem
-    sid = _get_session(request)
-    symbol_code = (request.data.get("symbol") or "").strip().upper()
-    if not symbol_code:
-        return Response({"error": "กรุณาระบุ symbol"}, status=400)
-
-    # ตรวจจำนวนสูงสุด 10 ตัว
-    count = WatchlistItem.objects.filter(user_session=sid).count()
-    if count >= 10:
-        return Response({"error": "Watchlist เต็มแล้ว (สูงสุด 10 ตัว)"}, status=400)
-
-    sym = Symbol.objects.filter(symbol=symbol_code).first()
-    if not sym:
-        return Response({"error": f"ไม่พบหุ้น {symbol_code} ในระบบ"}, status=404)
-
-    item, created = WatchlistItem.objects.get_or_create(
-        user_session=sid, symbol=sym,
-        defaults={
-            "alert_high": request.data.get("alert_high"),
-            "alert_low":  request.data.get("alert_low"),
-            "note":       request.data.get("note", ""),
-        }
-    )
-    return Response({"id": item.id, "symbol": sym.symbol,
-                     "created": created, "message": "เพิ่มแล้ว" if created else "มีอยู่แล้ว"})
-
-
-@api_view(["DELETE"])
-def watchlist_remove(request, item_id):
-    """DELETE /api/watchlist/<id>/remove/"""
-    from radar.models import WatchlistItem
-    sid = _get_session(request)
-    try:
-        item = WatchlistItem.objects.get(id=item_id, user_session=sid)
-        item.delete()
-        return Response({"message": "ลบแล้ว"})
-    except WatchlistItem.DoesNotExist:
-        return Response({"error": "ไม่พบรายการ"}, status=404)
-
-
-@api_view(["POST"])
-def watchlist_add_transaction(request, item_id):
-    """POST /api/watchlist/<id>/buy/ — เพิ่มรายการซื้อ"""
-    from radar.models import WatchlistItem, WatchlistTransaction
-    sid = _get_session(request)
-    try:
-        item = WatchlistItem.objects.get(id=item_id, user_session=sid)
-    except WatchlistItem.DoesNotExist:
-        return Response({"error": "ไม่พบ watchlist item"}, status=404)
-
-    buy_price = request.data.get("buy_price")
-    quantity  = request.data.get("quantity")
-    if not buy_price or not quantity:
-        return Response({"error": "กรุณาระบุ buy_price และ quantity"}, status=400)
-
-    tx = WatchlistTransaction.objects.create(
-        item=item,
-        buy_price=float(buy_price),
-        quantity=float(quantity),
-        date=request.data.get("date") or timezone.now().date(),
-        note=request.data.get("note", ""),
-    )
-    return Response({"id": tx.id, "buy_price": float(tx.buy_price),
-                     "quantity": float(tx.quantity), "avg_cost": round(item.avg_cost, 4)})
-
-
-@api_view(["DELETE"])
-def watchlist_remove_transaction(request, tx_id):
-    """DELETE /api/watchlist/tx/<tx_id>/"""
-    from radar.models import WatchlistTransaction
-    try:
-        tx = WatchlistTransaction.objects.get(id=tx_id)
-        tx.delete()
-        return Response({"message": "ลบรายการซื้อแล้ว"})
-    except WatchlistTransaction.DoesNotExist:
-        return Response({"error": "ไม่พบรายการ"}, status=404)
-
-
-@api_view(["POST"])
-def watchlist_calc_sell(request, item_id):
-    """POST /api/watchlist/<id>/calc/ — คำนวณกำไร/ขาดทุนถ้าขาย"""
-    from radar.models import WatchlistItem
-    sid = _get_session(request)
-    try:
-        item = WatchlistItem.objects.get(id=item_id, user_session=sid)
-    except WatchlistItem.DoesNotExist:
-        return Response({"error": "ไม่พบรายการ"}, status=404)
-
-    sell_price = float(request.data.get("sell_price", 0))
-    sell_qty   = float(request.data.get("sell_qty", item.total_quantity))
-    avg        = item.avg_cost
-
-    if not sell_price:
-        return Response({"error": "กรุณาระบุ sell_price"}, status=400)
-
-    gross      = sell_price * sell_qty
-    cost       = avg * sell_qty
-    commission = gross * 0.0017  # ค่าคอมมิชชั่น 0.17% (ตลาดไทย)
-    net        = gross - commission
-    pnl        = net - cost
-    pnl_pct    = pnl / cost * 100 if cost else 0
-    remaining  = item.total_quantity - sell_qty
-
-    return Response({
-        "sell_price":   sell_price,
-        "sell_qty":     sell_qty,
-        "avg_cost":     round(avg, 4),
-        "gross_revenue":round(gross, 2),
-        "commission":   round(commission, 2),
-        "net_revenue":  round(net, 2),
-        "cost_basis":   round(cost, 2),
-        "pnl":          round(pnl, 2),
-        "pnl_pct":      round(pnl_pct, 2),
-        "remaining_qty":round(remaining, 2),
-        "is_profit":    pnl >= 0,
-    })
-
-
-@api_view(["PATCH"])
-def watchlist_update_alert(request, item_id):
-    """PATCH /api/watchlist/<id>/alert/ — อัปเดต alert ราคา"""
-    from radar.models import WatchlistItem
-    sid = _get_session(request)
-    try:
-        item = WatchlistItem.objects.get(id=item_id, user_session=sid)
-    except WatchlistItem.DoesNotExist:
-        return Response({"error": "ไม่พบรายการ"}, status=404)
-
-    if "alert_high" in request.data:
-        item.alert_high = request.data["alert_high"] or None
-    if "alert_low" in request.data:
-        item.alert_low  = request.data["alert_low"]  or None
-    if "note" in request.data:
-        item.note = request.data["note"]
-    item.save()
-    return Response({"message": "อัปเดตแล้ว"})
-
 # ─── Fundamental Data API ──────────────────────────────────────────────────────
 
 @api_view(["GET"])
@@ -1416,3 +1146,131 @@ def watchlist_portfolio_history(request):
         return Response({"count": len(data), "history": data})
     except Exception as e:
         return Response({"error": str(e)}, status=500)
+
+
+@api_view(["POST"])
+def watchlist_calc_sell(request, item_id):
+    """POST /api/watchlist/item/<id>/calc-sell/ — คำนวณกำไร/ขาดทุนถ้าขาย"""
+    if not request.user.is_authenticated:
+        from django.contrib.auth.models import User as DjangoUser
+        user = DjangoUser.objects.filter(is_superuser=True).first()
+    else:
+        user = request.user
+
+    from radar.models import WatchlistItem
+    try:
+        item = WatchlistItem.objects.get(id=item_id, watchlist__user=user)
+    except WatchlistItem.DoesNotExist:
+        return Response({"error": "ไม่พบรายการ"}, status=404)
+
+    sell_price = float(request.data.get("sell_price", 0))
+    pos        = _calc_position(item)
+    sell_qty   = float(request.data.get("sell_qty") or pos["total_qty"])
+    avg_cost   = pos["avg_cost"]
+
+    if sell_price <= 0:
+        return Response({"error": "กรุณาระบุ sell_price"}, status=400)
+
+    gross      = sell_price * sell_qty
+    cost       = avg_cost * sell_qty
+    commission = gross * 0.0017   # ค่าคอม 0.17% (ตลาดไทย)
+    net        = gross - commission
+    pnl        = net - cost
+    pnl_pct    = pnl / cost * 100 if cost else 0
+    remaining  = pos["total_qty"] - sell_qty
+
+    return Response({
+        "sell_price":    sell_price,
+        "sell_qty":      sell_qty,
+        "avg_cost":      round(avg_cost, 4),
+        "gross_revenue": round(gross, 2),
+        "commission":    round(commission, 2),
+        "net_revenue":   round(net, 2),
+        "cost_basis":    round(cost, 2),
+        "pnl":           round(pnl, 2),
+        "pnl_pct":       round(pnl_pct, 2),
+        "remaining_qty": round(remaining, 2),
+        "is_profit":     pnl >= 0,
+    })
+
+
+@api_view(["PATCH"])
+def watchlist_update_alert(request, item_id):
+    """PATCH /api/watchlist/item/<id>/alert/ — อัปเดต alert ราคา"""
+    if not request.user.is_authenticated:
+        from django.contrib.auth.models import User as DjangoUser
+        user = DjangoUser.objects.filter(is_superuser=True).first()
+    else:
+        user = request.user
+
+    from radar.models import WatchlistItem
+    try:
+        item = WatchlistItem.objects.get(id=item_id, watchlist__user=user)
+    except WatchlistItem.DoesNotExist:
+        return Response({"error": "ไม่พบรายการ"}, status=404)
+
+    if "alert_price_high" in request.data:
+        item.alert_price_high = request.data["alert_price_high"] or None
+    if "alert_price_low" in request.data:
+        item.alert_price_low  = request.data["alert_price_low"]  or None
+    if "note" in request.data:
+        item.note = request.data["note"]
+    item.save()
+    return Response({"message": "อัปเดต Alert สำเร็จ"})
+
+
+@api_view(["GET"])
+def watchlist_portfolio_history(request):
+    """GET /api/watchlist/history/?days=90 — P/L history รายวัน"""
+    if not request.user.is_authenticated:
+        from django.contrib.auth.models import User as DjangoUser
+        user = DjangoUser.objects.filter(is_superuser=True).first()
+        if not user:
+            return Response({"error": "กรุณา login"}, status=401)
+    else:
+        user = request.user
+
+    days = int(request.query_params.get("days", 90))
+    try:
+        from radar.portfolio_history import calc_portfolio_history
+        data = calc_portfolio_history(user, days=days)
+        return Response({"count": len(data), "history": data})
+    except Exception as e:
+        return Response({"error": str(e)}, status=500)
+
+
+# ─── Fundamental Data API ─────────────────────────────────────────────────────
+
+@api_view(["GET"])
+def fundamental_data(request, symbol: str):
+    """GET /api/fundamental/<symbol>/ — P/E, EPS, งบการเงิน จาก yfinance"""
+    from radar.fundamental_engine import get_fundamental
+    sym_obj  = Symbol.objects.filter(symbol=symbol.upper()).first()
+    exchange = sym_obj.exchange if sym_obj else ""
+    try:
+        data = get_fundamental(symbol.upper(), exchange=exchange)
+        return Response(data)
+    except Exception as e:
+        return Response({"error": str(e)}, status=500)
+
+
+@api_view(["POST"])
+def fundamental_batch(request):
+    """POST /api/fundamental/batch/ — { symbols: ["PTT","AAPL"] }"""
+    from radar.fundamental_engine import get_fundamental
+    from concurrent.futures import ThreadPoolExecutor
+
+    symbols  = request.data.get("symbols", [])[:10]
+    if not symbols:
+        return Response({"error": "กรุณาระบุ symbols"}, status=400)
+
+    sym_map = {s.symbol: s.exchange
+               for s in Symbol.objects.filter(symbol__in=symbols)}
+
+    def fetch(sym):
+        return get_fundamental(sym, exchange=sym_map.get(sym, ""))
+
+    with ThreadPoolExecutor(max_workers=5) as ex:
+        results = list(ex.map(fetch, symbols))
+
+    return Response({"results": results})
