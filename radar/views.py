@@ -1274,3 +1274,19 @@ def fundamental_batch(request):
         results = list(ex.map(fetch, symbols))
 
     return Response({"results": results})
+
+
+# ─── Ticker Tape API ──────────────────────────────────────────────────────────
+
+@api_view(["GET"])
+def ticker_tape(request):
+    """
+    GET /api/ticker/ — ดัชนีตลาด สินค้าโภคภัณฑ์ FX Crypto
+    Cache 5 นาที · ใช้กับ Ticker Tape ด้านล่างหน้าจอ
+    """
+    try:
+        from radar.ticker_api import fetch_ticker_data
+        data = fetch_ticker_data()
+        return Response({"count": len(data), "items": data})
+    except Exception as e:
+        return Response({"error": str(e)}, status=500)

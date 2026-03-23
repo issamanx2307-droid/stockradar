@@ -20,6 +20,7 @@ import EngineBacktest from "./pages/EngineBacktest"
 import Watchlist from "./pages/Watchlist"
 import Fundamental from "./pages/Fundamental"
 import { AutoTermHighlight, TermAssistantProvider, TermAssistantToggle } from "./components/TermAssistant"
+import TickerTape from "./components/TickerTape"
 import "./App.css"
 
 const NAV_ITEMS = [
@@ -106,7 +107,7 @@ export default function App() {
         </div>
       </aside>
 
-      <main className="main-content">
+      <main className="main-content" style={{ paddingBottom: 34 }}>
         {showBackButton && (
           <div className="back-btn-container">
             <button className="back-btn" onClick={goBack}>
@@ -136,6 +137,7 @@ export default function App() {
         </AutoTermHighlight>
       </main>
       </div>
+      <TickerTape />
     </TermAssistantProvider>
   )
 }

@@ -38,4 +38,6 @@ urlpatterns = [
     # ── Fundamental Data ──
     path("fundamental/batch/",         views.fundamental_batch,  name="fundamental-batch"),
     path("fundamental/<str:symbol>/",  views.fundamental_data,   name="fundamental"),
+    # ── Ticker Tape ──
+    path("ticker/",                    views.ticker_tape,        name="ticker"),
 ]
