@@ -200,31 +200,40 @@ function AnalyzePanel({ symbol, onClose, onOpenChart }:
 export default function EngineScan({ onOpenChart }: { onOpenChart?: (s: string) => void }) {
   const [results, setResults]   = useState<EngineResult[]>([])
   const [loading, setLoading]   = useState(false)
+  const [error, setError]       = useState("")
   const [exchange, setExchange] = useState("")
-  const [minScore, setMinScore] = useState(0)      // default 0 = ดูทั้งหมด
+  const [minScore, setMinScore] = useState(0)
   const [topN, setTopN]         = useState(20)
   const [search, setSearch]     = useState("")
   const [selected, setSelected] = useState<string | null>(null)
-  const [days, setDays]         = useState(30)     // ขยาย default เป็น 30 วัน
+  const [days, setDays]         = useState(30)
+
+  // ใช้ ref เก็บ latest state เพื่อให้ load() เข้าถึงค่าล่าสุดเสมอ
+  const stateRef = useRef({ exchange, minScore, topN, days })
+  useEffect(() => { stateRef.current = { exchange, minScore, topN, days } }, [exchange, minScore, topN, days])
 
   async function load() {
-    setLoading(true)
+    const { exchange: ex, minScore: ms, topN: tn, days: d } = stateRef.current
+    setLoading(true); setError("")
     try {
-      // ส่ง days ผ่าน query param ด้วย
-      const res = await engineApi.scan({
-        exchange:  exchange || undefined,
-        top:       topN,
-        min_score: minScore,
-        days,
-      } as any)
-      setResults(res.results || [])
-    } catch (e) { console.error(e) }
+      const params = new URLSearchParams()
+      if (ex)  params.set("exchange",  ex)
+      params.set("top",       String(tn))
+      params.set("min_score", String(ms))
+      params.set("days",      String(d))
+      const res = await fetch(`${BASE}/engine/scan/?${params}`)
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      const data = await res.json()
+      setResults(data.results || [])
+      if ((data.results || []).length === 0) setError("ไม่พบสัญญาณในช่วงเวลาที่เลือก")
+    } catch (e: any) {
+      setError(e.message || "เกิดข้อผิดพลาด")
+    }
     setLoading(false)
   }
 
-  useEffect(() => { load() }, [])
+  useEffect(() => { load() }, [])  // โหลดครั้งแรก
 
-  // normalize + filter
   const filtered = results
     .map(r => ({ ...r, decision: normalizeDecision(r.decision || "") as any }))
     .filter(r => !search || r.symbol.includes(search.toUpperCase()))
@@ -324,11 +333,16 @@ export default function EngineScan({ onOpenChart }: { onOpenChart?: (s: string) 
         {/* Grid */}
         {loading ? (
           <div className="loading-state"><div className="loading-spinner" /><span>กำลัง scan...</span></div>
-        ) : filtered.length === 0 ? (
+        ) : error && filtered.length === 0 ? (
           <div className="empty-state">
             <span style={{ fontSize:48 }}>🔍</span>
-            <span>ไม่พบสัญญาณ — ลองขยายช่วงเวลาหรือลด Score ขั้นต่ำ</span>
-            <button className="btn btn-primary" onClick={() => { setMinScore(0); setDays(90); setTimeout(load, 100) }}
+            <span>{error}</span>
+            <button className="btn btn-primary"
+              onClick={() => {
+                setMinScore(0); setDays(90)
+                stateRef.current = { ...stateRef.current, minScore:0, days:90 }
+                load()
+              }}
               style={{ marginTop:12 }}>ดูทั้งหมด (90 วัน)</button>
           </div>
         ) : (
