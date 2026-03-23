@@ -1290,3 +1290,33 @@ def ticker_tape(request):
         return Response({"count": len(data), "items": data})
     except Exception as e:
         return Response({"error": str(e)}, status=500)
+
+
+# ─── Economic Calendar API ────────────────────────────────────────────────────
+
+@api_view(["GET"])
+def economic_calendar_api(request):
+    """
+    GET /api/calendar/?days=7
+    ปฏิทินเศรษฐกิจสัปดาห์นี้ จาก ForexFactory
+    Cache 1 ชั่วโมง
+    """
+    try:
+        days = int(request.query_params.get("days", 7))
+        from radar.economic_calendar import fetch_economic_calendar
+        data = fetch_economic_calendar(days_ahead=days)
+
+        # group by date
+        from collections import defaultdict
+        by_date: dict = defaultdict(list)
+        for ev in data:
+            by_date[ev["date"]].append(ev)
+
+        return Response({
+            "count": len(data),
+            "days":  days,
+            "by_date": dict(by_date),
+            "events": data,
+        })
+    except Exception as e:
+        return Response({"error": str(e)}, status=500)

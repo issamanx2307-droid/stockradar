@@ -865,3 +865,94 @@ body {
   border-bottom: 1px solid var(--border);
   background: rgba(255,255,255,0.02);
 }
+
+/* ─── Mobile Responsive ─────────────────────────────────────────────────────── */
+@media (max-width: 768px) {
+  .app { flex-direction: column; }
+
+  .sidebar {
+    width: 100% !important;
+    height: auto;
+    flex-direction: row;
+    padding: 8px 0;
+    overflow-x: auto;
+    overflow-y: hidden;
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+
+  .sidebar-logo { display: none; }
+  .sidebar-footer { display: none; }
+
+  .sidebar-nav {
+    display: flex;
+    flex-direction: row;
+    gap: 2px;
+    padding: 0 8px;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .sidebar-nav::-webkit-scrollbar { display: none; }
+
+  .nav-btn {
+    flex-direction: column;
+    padding: 6px 10px;
+    min-width: 60px;
+    font-size: 10px;
+    gap: 2px;
+    white-space: nowrap;
+    border-radius: 8px;
+  }
+  .nav-icon { font-size: 18px; }
+  .nav-label { font-size: 9px; }
+
+  .main-content {
+    padding: 0 !important;
+    overflow-x: hidden;
+  }
+
+  .page-header { padding: 16px 12px 8px !important; }
+  .page-title  { font-size: 18px !important; }
+  .page-body   { padding: 0 8px 40px !important; }
+
+  .card { padding: 12px !important; border-radius: 8px !important; }
+
+  /* Stats grid: 2 columns on mobile */
+  .stats-grid { grid-template-columns: repeat(2, 1fr) !important; }
+
+  /* Two-column grids → single column */
+  div[style*="grid-template-columns: 1fr 1fr"],
+  div[style*="gridTemplateColumns: \"1fr 1fr\""] {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Table: hide less important columns */
+  .data-table th:nth-child(n+5),
+  .data-table td:nth-child(n+5) { display: none; }
+
+  /* Ticker tape: smaller font */
+  div[style*="position: fixed"][style*="bottom: 0"] span { font-size: 10px !important; }
+
+  /* Back button */
+  .back-btn-container { padding: 8px 12px !important; }
+
+  /* Watchlist grid 3-col → 1-col */
+  div[style*="gridTemplateColumns: \"1fr 1fr 1fr\""] {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Filter bar wrap */
+  .filters { flex-wrap: wrap !important; }
+  .filter-select, .filter-input { min-width: 100px; }
+}
+
+@media (max-width: 480px) {
+  .nav-btn { min-width: 50px; padding: 4px 8px; }
+  .page-title { font-size: 15px !important; }
+  .stat-value { font-size: 18px !important; }
+  .stats-grid { gap: 8px !important; }
+}
