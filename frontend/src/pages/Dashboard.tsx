@@ -1,6 +1,6 @@
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { api } from "../api/client"
-import { SignalInfo, DashboardResponse } from "../api/types"
+import { SignalInfo } from "../api/types"
 import { TermText } from "../components/TermAssistant"
 
 const SIGNAL_LABELS: Record<string, string> = {
@@ -9,6 +9,11 @@ const SIGNAL_LABELS: Record<string, string> = {
   EMA_PULLBACK:"EMA Pull", SELL:"ขาย", STRONG_SELL:"ขายแรง",
   DEATH_CROSS:"Death✕", BREAKDOWN:"Breakdown", OVERBOUGHT:"Overbought",
   WATCH:"เฝ้าดู", ALERT:"แจ้งเตือน",
+}
+const SIGNAL_EMOJIS: Record<string, string> = {
+  BUY:"🟢", STRONG_BUY:"💚", BREAKOUT:"🚀", GOLDEN_CROSS:"⭐", OVERSOLD:"🔵",
+  SELL:"🔴", STRONG_SELL:"❤️", DEATH_CROSS:"💀", BREAKDOWN:"💥", OVERBOUGHT:"🟡",
+  WATCH:"👁️", ALERT:"⚠️", EMA_ALIGNMENT:"📈", EMA_PULLBACK:"↩️",
 }
 const SIG_COLOR: Record<string,string> = {
   BUY:"var(--green)", STRONG_BUY:"#00c853", GOLDEN_CROSS:"#00c853",
@@ -20,40 +25,43 @@ const SIG_COLOR: Record<string,string> = {
 
 function formatTime(iso: string) {
   if (!iso) return "-"
-  return new Date(iso).toLocaleString("th-TH", { month:"short", day:"numeric", hour:"2-digit", minute:"2-digit" })
+  return new Date(iso).toLocaleString("th-TH", {
+    month:"short", day:"numeric", hour:"2-digit", minute:"2-digit"
+  })
 }
 
 function Badge({ type }: { type: string }) {
   const color = SIG_COLOR[type] || "var(--text-muted)"
   const label = SIGNAL_LABELS[type] || type
+  const emoji = SIGNAL_EMOJIS[type] || ""
   return (
     <span style={{
-      fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 4,
-      background: `${color}18`, color, border: `1px solid ${color}44`,
-      whiteSpace: "nowrap",
-    }}>{label}</span>
+      fontSize:11, fontWeight:700, padding:"2px 8px", borderRadius:4,
+      background:`${color}18`, color, border:`1px solid ${color}44`,
+      whiteSpace:"nowrap", display:"inline-flex", alignItems:"center", gap:4,
+    }}>{emoji} {label}</span>
   )
 }
 
 function ScoreBar({ score }: { score: number }) {
   const s = Number(score) || 0
-  const color = s >= 80 ? "#00c853" : s >= 60 ? "var(--green)" : s >= 40 ? "var(--yellow)" : "var(--red)"
+  const color = s>=80?"#00c853":s>=60?"var(--green)":s>=40?"var(--yellow)":"var(--red)"
   return (
     <div style={{ display:"flex", alignItems:"center", gap:6 }}>
       <div style={{ flex:1, height:5, background:"var(--border)", borderRadius:3 }}>
         <div style={{ width:`${s}%`, height:"100%", background:color, borderRadius:3 }} />
       </div>
       <span style={{ fontFamily:"var(--font-mono)", fontSize:12, fontWeight:700, color, minWidth:28, textAlign:"right" }}>
-        {s > 0 ? s.toFixed(0) : "-"}
+        {s>0?s.toFixed(0):"-"}
       </span>
     </div>
   )
 }
 
-// ── Signal Table Component ────────────────────────────────
-function SignalTable({ signals, onOpenChart }: { signals: SignalInfo[], onOpenChart: (s:string)=>void }) {
+// ── Signal Table ─────────────────────────────────────────
+function SignalTable({ signals, onOpenChart }: { signals: SignalInfo[], onOpenChart:(s:string)=>void }) {
   if (signals.length === 0)
-    return <div style={{ textAlign:"center", padding:"32px 0", color:"var(--text-muted)", fontSize:13 }}>ไม่มีสัญญาณในช่วง 7 วัน</div>
+    return <div style={{ textAlign:"center", padding:"40px 0", color:"var(--text-muted)", fontSize:13 }}>ไม่พบสัญญาณที่ตรงเงื่อนไข</div>
 
   return (
     <div style={{ overflowX:"auto" }}>
@@ -65,14 +73,13 @@ function SignalTable({ signals, onOpenChart }: { signals: SignalInfo[], onOpenCh
             <th style={{ textAlign:"right" }}>ราคา</th>
             <th style={{ textAlign:"right" }}>Stop Loss</th>
             <th style={{ textAlign:"right" }}>Risk %</th>
-            <th style={{ minWidth:140 }}>Score</th>
+            <th style={{ minWidth:130 }}>Score</th>
             <th style={{ textAlign:"right", paddingRight:16 }}>เวลา</th>
           </tr>
         </thead>
         <tbody>
           {signals.map((s, i) => (
-            <tr key={i} onClick={() => onOpenChart(s.symbol_code)}
-              style={{ cursor:"pointer" }}>
+            <tr key={i} onClick={() => onOpenChart(s.symbol_code)} style={{ cursor:"pointer" }}>
               <td style={{ paddingLeft:16 }}>
                 <div style={{ display:"flex", flexDirection:"column" }}>
                   <span style={{ fontFamily:"var(--font-mono)", fontWeight:700, fontSize:14, color:"var(--accent)" }}>
@@ -83,16 +90,16 @@ function SignalTable({ signals, onOpenChart }: { signals: SignalInfo[], onOpenCh
               </td>
               <td><Badge type={s.signal_type} /></td>
               <td style={{ textAlign:"right", fontFamily:"var(--font-mono)", fontWeight:600 }}>
-                {s.price?.toLocaleString("th-TH", { minimumFractionDigits:2 }) || "-"}
+                {s.price?.toLocaleString("th-TH",{minimumFractionDigits:2})||"-"}
               </td>
               <td style={{ textAlign:"right", fontFamily:"var(--font-mono)", color:"var(--red)", fontSize:12 }}>
-                {(s as any).stop_loss?.toLocaleString("th-TH", { minimumFractionDigits:2 }) || "-"}
+                {(s as any).stop_loss?.toLocaleString("th-TH",{minimumFractionDigits:2})||"-"}
               </td>
               <td style={{ textAlign:"right", fontFamily:"var(--font-mono)", fontSize:12, color:"var(--yellow)" }}>
-                {(s as any).risk_pct ? `${(s as any).risk_pct}%` : "-"}
+                {(s as any).risk_pct?`${(s as any).risk_pct}%`:"-"}
               </td>
-              <td style={{ minWidth:140 }}><ScoreBar score={s.score} /></td>
-              <td style={{ textAlign:"right", fontSize:11, color:"var(--text-muted)", paddingRight:16 }}>
+              <td style={{ minWidth:130 }}><ScoreBar score={s.score} /></td>
+              <td style={{ textAlign:"right", fontSize:11, color:"var(--text-muted)", paddingRight:16, whiteSpace:"nowrap" }}>
                 {formatTime(s.created_at)}
               </td>
             </tr>
@@ -103,72 +110,17 @@ function SignalTable({ signals, onOpenChart }: { signals: SignalInfo[], onOpenCh
   )
 }
 
-// ── Tabbed Signal Section ─────────────────────────────────
-const TABS = [
-  { id:"buy",      label:"สัญญาณซื้อ",  icon:"🟢", color:"var(--green)" },
-  { id:"sell",     label:"สัญญาณขาย",  icon:"🔴", color:"var(--red)"   },
-  { id:"breakout", label:"Breakout",   icon:"🚀", color:"var(--accent)" },
-  { id:"watch",    label:"เฝ้าดู",     icon:"👁️", color:"var(--text-muted)" },
-]
-
-function SignalTabs({ buyList, sellList, breakoutList, watchList, stats, onOpenChart }: {
-  buyList: SignalInfo[], sellList: SignalInfo[],
-  breakoutList: SignalInfo[], watchList: SignalInfo[],
-  stats: any, onOpenChart: (s:string)=>void
-}) {
-  const [active, setActive] = useState("buy")
-
-  const tabData: Record<string,SignalInfo[]> = {
-    buy: buyList, sell: sellList, breakout: breakoutList, watch: watchList,
-  }
-  const tabCount: Record<string,number> = {
-    buy:      stats?.buy_signals    || buyList.length,
-    sell:     stats?.sell_signals   || sellList.length,
-    breakout: stats?.breakout_count || breakoutList.length,
-    watch:    stats?.watch_count    || watchList.length,
-  }
-
-  return (
-    <div className="card" style={{ padding:0 }}>
-      {/* Tab Headers */}
-      <div style={{ display:"flex", borderBottom:"1px solid var(--border)", padding:"0 8px" }}>
-        {TABS.map(tab => (
-          <button key={tab.id} onClick={() => setActive(tab.id)} style={{
-            padding:"12px 16px", fontSize:13, fontWeight:700, cursor:"pointer",
-            border:"none", background:"transparent",
-            borderBottom: active===tab.id ? `2px solid ${tab.color}` : "2px solid transparent",
-            color: active===tab.id ? tab.color : "var(--text-muted)",
-            display:"flex", alignItems:"center", gap:6, transition:"color 0.15s",
-            marginBottom:-1,
-          }}>
-            <span>{tab.icon}</span>
-            <span>{tab.label}</span>
-            <span style={{
-              fontSize:10, fontWeight:700, padding:"1px 6px", borderRadius:10,
-              background: active===tab.id ? `${tab.color}20` : "var(--bg-elevated)",
-              color: active===tab.id ? tab.color : "var(--text-muted)",
-            }}>{tabCount[tab.id]}</span>
-          </button>
-        ))}
-      </div>
-      {/* Tab Content */}
-      <div style={{ padding:"4px 0 8px" }}>
-        <SignalTable signals={tabData[active]} onOpenChart={onOpenChart} />
-      </div>
-    </div>
-  )
-}
-
 // ── Quick Actions ─────────────────────────────────────────
 function QuickActions() {
   const [scanning, setScanning] = useState(false)
   const [done, setDone]         = useState(false)
   const [count, setCount]       = useState(0)
+  const BASE = (import.meta as any).env.VITE_API_URL || "http://127.0.0.1:8000/api"
 
   async function handleScan() {
     setScanning(true); setDone(false)
     try {
-      const res = await fetch("http://127.0.0.1:8000/api/scanner/run/", {
+      const res = await fetch(`${BASE}/scanner/run/`, {
         method:"POST", headers:{"Content-Type":"application/json"}, body:"{}"
       })
       const d = await res.json()
@@ -183,10 +135,10 @@ function QuickActions() {
         onClick={handleScan} disabled={scanning}>
         {scanning ? "⏳ กำลังสแกน..." : "▶ รัน Scanner ทันที"}
       </button>
-      {done && <div style={{ fontSize:12, color:"var(--green)", padding:"4px 8px",
-        background:"var(--green-dim)", borderRadius:6 }}>✅ พบ {count} สัญญาณ</div>}
+      {done && <div style={{ fontSize:12, color:"var(--green)", padding:"6px 10px",
+        background:"rgba(0,200,83,.1)", borderRadius:6 }}>✅ พบ {count} สัญญาณ</div>}
       <button className="btn btn-ghost" style={{ width:"100%", justifyContent:"flex-start" }}
-        onClick={() => fetch("http://127.0.0.1:8000/api/cache/warmup/",{method:"POST",headers:{"Content-Type":"application/json"},body:"{}"})}>
+        onClick={() => fetch(`${BASE}/cache/warmup/`,{method:"POST",headers:{"Content-Type":"application/json"},body:"{}"})}>
         🔥 Warm-up Cache
       </button>
       <div style={{ borderTop:"1px solid var(--border)", paddingTop:8, marginTop:4 }}>
@@ -199,119 +151,208 @@ function QuickActions() {
   )
 }
 
+// ── Filter Bar ────────────────────────────────────────────
+interface FilterState {
+  signal_type: string; exchange: string; days: string
+  direction: string; min_score: string
+}
+const DEFAULT_FILTER: FilterState = {
+  signal_type:"", exchange:"", days:"7", direction:"", min_score:""
+}
+
+// ── Tab Config ────────────────────────────────────────────
+const TABS = [
+  { id:"all",      label:"ทั้งหมด",      icon:"📋", dir:"",      color:"var(--text-primary)" },
+  { id:"buy",      label:"สัญญาณซื้อ",   icon:"🟢", dir:"LONG",  color:"var(--green)" },
+  { id:"sell",     label:"สัญญาณขาย",   icon:"🔴", dir:"SHORT", color:"var(--red)"   },
+  { id:"breakout", label:"Breakout",    icon:"🚀", dir:"",      color:"var(--accent)" },
+  { id:"watch",    label:"เฝ้าดู",      icon:"👁️", dir:"",      color:"var(--text-muted)" },
+]
+
 // ── Main Dashboard ────────────────────────────────────────
-export default function Dashboard({ onOpenChart }: { onOpenChart: (s: string) => void, ws: any }) {
-  const [data, setData]         = useState<any>(null)
-  const [tabData, setTabData]   = useState({ buy:[], sell:[], breakout:[], watch:[] } as Record<string,SignalInfo[]>)
+export default function Dashboard({ onOpenChart }: { onOpenChart:(s:string)=>void, ws:any }) {
+  const [stats, setStats]       = useState<any>({})
+  const [signals, setSignals]   = useState<SignalInfo[]>([])
   const [loading, setLoading]   = useState(true)
-  const [error, setError]       = useState<string|null>(null)
+  const [sigLoading, setSigLoading] = useState(false)
+  const [activeTab, setActiveTab]   = useState("all")
+  const [filter, setFilter]         = useState<FilterState>(DEFAULT_FILTER)
+  const BASE = (import.meta as any).env.VITE_API_URL || "http://127.0.0.1:8000/api"
 
+  // โหลด stats ครั้งแรก
   useEffect(() => {
-    const BASE = "http://127.0.0.1:8000/api"
-    setLoading(true)
-
-    // โหลดทุกอย่างพร้อมกัน
-    Promise.all([
-      api.getDashboard(),
-      fetch(`${BASE}/signals/?direction=LONG&days=7&page_size=50`).then(r=>r.json()),
-      fetch(`${BASE}/signals/?direction=SHORT&days=7&page_size=50`).then(r=>r.json()),
-      fetch(`${BASE}/signals/?signal_type=BREAKOUT&days=7&page_size=50`).then(r=>r.json()),
-      fetch(`${BASE}/signals/?signal_type=WATCH&days=7&page_size=50`).then(r=>r.json()),
-    ]).then(([dash, buyR, sellR, brkR, watchR]) => {
-      setData(dash)
-      setTabData({
-        buy:      buyR.results   || [],
-        sell:     sellR.results  || [],
-        breakout: brkR.results   || [],
-        watch:    watchR.results || [],
-      })
-    }).catch(e => setError(e.message))
+    api.getDashboard()
+      .then(d => setStats(d?.stats || {}))
+      .catch(console.error)
       .finally(() => setLoading(false))
   }, [])
 
-  if (loading) return <div className="loading-state"><div className="loading-spinner" /><span>กำลังโหลดข้อมูล...</span></div>
-  if (error)   return <div className="empty-state"><span>⚠️</span><span style={{ color:"var(--red)" }}>{error}</span></div>
+  // โหลด signals ตาม filter + tab
+  const loadSignals = useCallback(() => {
+    setSigLoading(true)
+    const tab = TABS.find(t => t.id === activeTab)!
+    const params: Record<string,string> = { days: filter.days, page_size:"100" }
+    if (filter.exchange)    params.exchange    = filter.exchange
+    if (filter.min_score)   params.min_score   = filter.min_score
+    // direction จาก tab หรือ manual filter
+    const dir = tab.dir || filter.direction
+    if (dir) params.direction = dir
+    // signal_type จาก filter หรือ tab preset
+    if (filter.signal_type) {
+      params.signal_type = filter.signal_type
+    } else if (activeTab === "breakout") {
+      params.signal_type = "BREAKOUT"
+    } else if (activeTab === "watch") {
+      params.signal_type = "WATCH"
+    }
 
-  const stats  = data?.stats || {}
-  const latest = data?.latest_signals || []
+    api.getSignals(params)
+      .then(d => setSignals(d.results || []))
+      .catch(console.error)
+      .finally(() => setSigLoading(false))
+  }, [activeTab, filter])
+
+  useEffect(() => { loadSignals() }, [loadSignals])
+
+  function setF(k: keyof FilterState, v: string) {
+    setFilter(f => ({ ...f, [k]: v }))
+  }
+
+  // summary counts
+  const bullish = signals.filter(s => ["BUY","STRONG_BUY","BREAKOUT","GOLDEN_CROSS","OVERSOLD","EMA_ALIGNMENT","EMA_PULLBACK"].includes(s.signal_type)).length
+  const bearish = signals.filter(s => ["SELL","STRONG_SELL","DEATH_CROSS","BREAKDOWN","OVERBOUGHT"].includes(s.signal_type)).length
+  const avgScore = signals.length > 0
+    ? (signals.reduce((a,r) => a + (Number(r.score)||0), 0) / signals.length).toFixed(0)
+    : "—"
+
+  if (loading) return <div className="loading-state"><div className="loading-spinner"/><span>กำลังโหลด...</span></div>
 
   return (
     <div className="fade-up">
       <div className="page-header">
         <div className="page-title">📡 Radar หุ้น</div>
-        <div className="page-subtitle">ภาพรวมตลาด · สัญญาณซื้อขายล่าสุด</div>
+        <div className="page-subtitle">ภาพรวมตลาด · สัญญาณซื้อขาย · กรองและค้นหาได้ทันที</div>
       </div>
       <div className="page-body">
 
-        {/* ── Stats ── */}
-        <div className="stats-grid" style={{ marginBottom:20 }}>
+        {/* ── Stats Row ── */}
+        <div className="stats-grid" style={{ marginBottom:16 }}>
           {[
-            { label:"หุ้นทั้งหมด",  val: stats.total_symbols,  color:"accent" },
-            { label:"สัญญาณซื้อ",   val: stats.buy_signals,    color:"green"  },
-            { label:"สัญญาณขาย",   val: stats.sell_signals,   color:"red"    },
-            { label:"Breakout",    val: stats.breakout_count, color:"yellow" },
+            { label:"หุ้นทั้งหมด",  val:stats.total_symbols, color:"accent" },
+            { label:"Bullish",      val:bullish,              color:"green"  },
+            { label:"Bearish",      val:bearish,              color:"red"    },
+            { label:"สัญญาณรวม",   val:signals.length,       color:"yellow" },
+            { label:"Score เฉลี่ย", val:avgScore,             color:"accent" },
           ].map(({ label, val, color }) => (
             <div key={label} className={`stat-card ${color}`}>
               <div className="stat-label">{label}</div>
-              <div className="stat-value">{(val||0).toLocaleString()}</div>
+              <div className="stat-value">{(val||0).toLocaleString?.() ?? val}</div>
             </div>
           ))}
         </div>
 
-        {/* ── Signal Tables (Tabs) ── */}
-        <SignalTabs
-          buyList={tabData.buy} sellList={tabData.sell}
-          breakoutList={tabData.breakout} watchList={tabData.watch}
-          stats={stats} onOpenChart={onOpenChart}
-        />
+        {/* ── Main Layout ── */}
+        <div style={{ display:"grid", gridTemplateColumns:"1fr 240px", gap:16 }}>
 
-        {/* ── Bottom Row ── */}
-        <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 280px", gap:16, marginTop:16 }}>
+          {/* ── Left: Signal Panel ── */}
+          <div>
+            {/* Tab Bar */}
+            <div style={{ display:"flex", borderBottom:"1px solid var(--border)", marginBottom:0,
+              background:"var(--bg-surface)", borderRadius:"12px 12px 0 0",
+              border:"1px solid var(--border)", borderBottomColor:"transparent", padding:"0 8px" }}>
+              {TABS.map(tab => (
+                <button key={tab.id} onClick={() => setActiveTab(tab.id)} style={{
+                  padding:"10px 14px", fontSize:12, fontWeight:700, cursor:"pointer",
+                  border:"none", background:"transparent",
+                  borderBottom: activeTab===tab.id?`2px solid ${tab.color}`:"2px solid transparent",
+                  color: activeTab===tab.id?tab.color:"var(--text-muted)",
+                  display:"flex", alignItems:"center", gap:5, transition:"color 0.15s",
+                  marginBottom:-1, whiteSpace:"nowrap",
+                }}>
+                  {tab.icon} {tab.label}
+                </button>
+              ))}
+            </div>
 
-          {/* Latest Signals */}
-          <div className="card">
-            <div className="card-title">🔔 สัญญาณล่าสุด</div>
-            {latest.slice(0,10).map((s: SignalInfo, i: number) => (
-              <div key={i} className="signal-item" onClick={() => onOpenChart(s.symbol_code)}
-                style={{ cursor:"pointer" }}>
-                <div className="signal-symbol">{s.symbol_code}</div>
-                <div className="signal-info">
-                  <Badge type={s.signal_type} />
-                  <div className="signal-time" style={{ marginTop:3, fontSize:11 }}>
-                    {s.exchange} · {formatTime(s.created_at)}
-                  </div>
-                </div>
-                <div className="price-cell" style={{ textAlign:"right", fontFamily:"var(--font-mono)", fontSize:13 }}>
-                  {s.price?.toLocaleString("th-TH",{minimumFractionDigits:2})}
-                </div>
-              </div>
-            ))}
+            {/* Filter Bar */}
+            <div style={{ background:"var(--bg-elevated)", border:"1px solid var(--border)",
+              borderTop:"none", padding:"10px 14px", display:"flex", gap:8, flexWrap:"wrap", alignItems:"center" }}>
+              <select className="filter-select" style={{ fontSize:11 }} value={filter.signal_type}
+                onChange={e => setF("signal_type", e.target.value)}>
+                <option value="">ทุกสัญญาณ</option>
+                {Object.entries(SIGNAL_LABELS).map(([k,v]) => (
+                  <option key={k} value={k}>{SIGNAL_EMOJIS[k]} {v}</option>
+                ))}
+              </select>
+              <select className="filter-select" style={{ fontSize:11 }} value={filter.exchange}
+                onChange={e => setF("exchange", e.target.value)}>
+                <option value="">ทุกตลาด</option>
+                <option value="SET">🇹🇭 SET</option>
+                <option value="NASDAQ">🇺🇸 NASDAQ</option>
+                <option value="NYSE">🇺🇸 NYSE</option>
+              </select>
+              <select className="filter-select" style={{ fontSize:11 }} value={filter.days}
+                onChange={e => setF("days", e.target.value)}>
+                <option value="1">วันนี้</option>
+                <option value="7">7 วัน</option>
+                <option value="30">30 วัน</option>
+                <option value="90">90 วัน</option>
+              </select>
+              <input className="filter-select" style={{ width:80, fontSize:11 }}
+                placeholder="Score ≥" type="number"
+                value={filter.min_score} onChange={e => setF("min_score", e.target.value)} />
+              <button className="btn btn-primary" style={{ fontSize:11, padding:"5px 14px", height:30 }}
+                onClick={loadSignals}>กรอง</button>
+              {(filter.signal_type||filter.exchange||filter.min_score||filter.days!=="7") && (
+                <button className="btn btn-ghost" style={{ fontSize:11, padding:"5px 10px", height:30 }}
+                  onClick={() => setFilter(DEFAULT_FILTER)}>✕ ล้าง</button>
+              )}
+              <span style={{ marginLeft:"auto", fontSize:11, color:"var(--text-muted)" }}>
+                {sigLoading ? "⏳" : `${signals.length} รายการ`}
+              </span>
+            </div>
+
+            {/* Signal Table */}
+            <div style={{ background:"var(--bg-surface)", border:"1px solid var(--border)",
+              borderTop:"none", borderRadius:"0 0 12px 12px", overflow:"hidden" }}>
+              {sigLoading
+                ? <div className="loading-state" style={{ height:300 }}><div className="loading-spinner"/><span>กำลังโหลด...</span></div>
+                : <SignalTable signals={signals} onOpenChart={onOpenChart} />
+              }
+            </div>
           </div>
 
-          {/* Exchange breakdown */}
-          <div className="card">
-            <div className="card-title">🌏 สัญญาณตามตลาด</div>
-            {["NYSE","NASDAQ","SET"].map(exch => {
-              const cnt = latest.filter((s:SignalInfo) => s.exchange===exch).length
-              return cnt > 0 ? (
-                <div key={exch} style={{ marginBottom:12 }}>
-                  <div style={{ display:"flex", justifyContent:"space-between", marginBottom:4, fontSize:13 }}>
-                    <span style={{ fontWeight:600 }}>{exch}</span>
-                    <span style={{ fontFamily:"var(--font-mono)", color:"var(--accent)" }}>{cnt}</span>
-                  </div>
-                  <div style={{ background:"var(--border)", borderRadius:2, height:4 }}>
-                    <div style={{ background:"var(--accent)", borderRadius:2, height:"100%",
-                      width:`${(cnt/Math.max(latest.length,1))*100}%` }} />
-                  </div>
-                </div>
-              ) : null
-            })}
-          </div>
+          {/* ── Right: Sidebar ── */}
+          <div style={{ display:"flex", flexDirection:"column", gap:16 }}>
 
-          {/* Quick Actions */}
-          <div className="card">
-            <div className="card-title">⚡ การดำเนินการด่วน</div>
-            <QuickActions />
+            {/* Market breakdown */}
+            <div className="card">
+              <div className="card-title">🌏 สัญญาณตามตลาด</div>
+              {["SET","NASDAQ","NYSE"].map(ex => {
+                const cnt = signals.filter(s => s.exchange===ex).length
+                if (!cnt) return null
+                return (
+                  <div key={ex} style={{ marginBottom:10 }}>
+                    <div style={{ display:"flex", justifyContent:"space-between", marginBottom:3, fontSize:12 }}>
+                      <span style={{ fontWeight:600 }}>{ex}</span>
+                      <span style={{ fontFamily:"var(--font-mono)", color:"var(--accent)" }}>{cnt}</span>
+                    </div>
+                    <div style={{ background:"var(--border)", borderRadius:2, height:4 }}>
+                      <div style={{ background:"var(--accent)", borderRadius:2, height:"100%",
+                        width:`${(cnt/Math.max(signals.length,1))*100}%` }} />
+                    </div>
+                  </div>
+                )
+              })}
+              {signals.length === 0 && <div style={{ fontSize:12, color:"var(--text-muted)" }}>ไม่มีข้อมูล</div>}
+            </div>
+
+            {/* Quick Actions */}
+            <div className="card">
+              <div className="card-title">⚡ ดำเนินการด่วน</div>
+              <QuickActions />
+            </div>
+
           </div>
         </div>
 
