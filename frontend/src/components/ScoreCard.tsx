@@ -20,6 +20,8 @@ const BREAKDOWN_CONFIG = [
 export default function ScoreCard({ data, onClick }: Props) {
   const score = typeof data.score === "number" ? data.score : (data as any).score?.total_score ?? 0
   const bd = (data as any).breakdown || {}
+  // normalize decision: "STRONG_BUY" → "STRONG BUY"
+  const decision = (data.decision || "").replace(/_/g, " ") as any
 
   return (
     <div onClick={onClick} style={{
@@ -34,7 +36,7 @@ export default function ScoreCard({ data, onClick }: Props) {
       {/* Header */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
         <span style={{ fontFamily: "var(--font-mono)", fontWeight: 700, fontSize: 16 }}>{data.symbol}</span>
-        <DecisionBadge decision={data.decision} size="sm" />
+        <DecisionBadge decision={decision} size="sm" />
       </div>
 
       {/* Score Ring */}

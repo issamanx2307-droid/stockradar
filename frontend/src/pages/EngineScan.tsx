@@ -1,21 +1,82 @@
 /**
- * pages/EngineScan.tsx
- * Top Opportunities — 5-Factor Scoring Engine
- * คลิกหุ้นเพื่อดู full analysis panel (entry, stop loss, reasons)
+ * pages/EngineScan.tsx — Top Opportunities
+ * แก้ไข: decision key mismatch (STRONG_BUY vs "STRONG BUY"), default score/days, symbol search autocomplete
  */
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { engineApi, EngineResult } from "../api/engineApi"
+import { API_BASE } from "../api/config"
 import ScoreCard from "../components/ScoreCard"
 import DecisionBadge from "../components/DecisionBadge"
 
-const BASE = (import.meta as any).env.VITE_API_URL?.replace("/api","") || "http://127.0.0.1:8000"
+const BASE = API_BASE.replace("/api", "")
+
+// normalize decision key: "STRONG_BUY" → "STRONG BUY"
+const normalizeDecision = (d: string) => d.replace(/_/g, " ")
+
+// ── Symbol Autocomplete Search ────────────────────────────────────────────────
+function SymbolSearch({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const [results, setResults] = useState<any[]>([])
+  const [open, setOpen] = useState(false)
+  const timer = useRef<any>(null)
+  const wrap  = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const h = (e: MouseEvent) => { if (!wrap.current?.contains(e.target as Node)) setOpen(false) }
+    document.addEventListener("mousedown", h)
+    return () => document.removeEventListener("mousedown", h)
+  }, [])
+
+  useEffect(() => {
+    clearTimeout(timer.current)
+    if (!value.trim() || value.length < 1) { setResults([]); setOpen(false); return }
+    timer.current = setTimeout(async () => {
+      try {
+        const res = await fetch(`${API_BASE}/symbols/?search=${value}&page_size=10`)
+        const d = await res.json()
+        setResults(d.results || [])
+        setOpen(true)
+      } catch { setResults([]) }
+    }, 200)
+  }, [value])
+
+  const FLAG: Record<string, string> = { SET:"🇹🇭", NASDAQ:"🇺🇸", NYSE:"🇺🇸" }
+
+  return (
+    <div ref={wrap} style={{ position:"relative", flex:1, minWidth:180 }}>
+      <input className="filter-input" placeholder="🔍 ค้นหารหัสหุ้น เช่น PTT, AAPL..."
+        value={value} onChange={e => onChange(e.target.value.toUpperCase())}
+        onKeyDown={e => e.key === "Escape" && setOpen(false)}
+        style={{ width:"100%" }} autoComplete="off" />
+      {open && results.length > 0 && (
+        <div style={{ position:"absolute", top:"calc(100% + 4px)", left:0, right:0, zIndex:999,
+          background:"var(--bg-surface,#1a2332)", border:"1px solid var(--border)",
+          borderRadius:8, maxHeight:260, overflowY:"auto", boxShadow:"0 8px 24px rgba(0,0,0,.4)" }}>
+          {results.map((s: any) => (
+            <div key={s.symbol} onMouseDown={() => { onChange(s.symbol); setOpen(false) }}
+              style={{ padding:"8px 14px", cursor:"pointer", display:"flex", gap:10, alignItems:"center",
+                borderBottom:"1px solid var(--border)", transition:"background .1s" }}
+              onMouseEnter={e => (e.currentTarget.style.background = "var(--bg-elevated)")}
+              onMouseLeave={e => (e.currentTarget.style.background = "transparent")}>
+              <span>{FLAG[s.exchange] || "🌐"}</span>
+              <span style={{ fontFamily:"var(--font-mono)", fontWeight:700, color:"var(--accent)", minWidth:60 }}>{s.symbol}</span>
+              <span style={{ fontSize:12, color:"var(--text-muted)", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{s.name}</span>
+              <span style={{ fontSize:10, padding:"1px 6px", borderRadius:4, flexShrink:0,
+                background: s.exchange==="SET"?"#0d4f3c":"#1a2c5e",
+                color: s.exchange==="SET"?"#00e676":"#7eb3ff" }}>{s.exchange}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
 
 // ── Analyze Panel ─────────────────────────────────────────────────────────────
 function AnalyzePanel({ symbol, onClose, onOpenChart }:
   { symbol: string; onClose: () => void; onOpenChart?: (s: string) => void }) {
-  const [data, setData]     = useState<EngineResult | null>(null)
+  const [data, setData]       = useState<any>(null)
   const [loading, setLoading] = useState(true)
-  const [error, setError]   = useState("")
+  const [error, setError]     = useState("")
 
   useEffect(() => {
     setLoading(true); setError("")
@@ -26,33 +87,25 @@ function AnalyzePanel({ symbol, onClose, onOpenChart }:
       .finally(() => setLoading(false))
   }, [symbol])
 
-  const bd = (data as any)?.breakdown || {}
+  const bd  = data?.breakdown || {}
+  const dec = data ? normalizeDecision(data.decision || "") : ""
 
   return (
-    <div style={{
-      position: "fixed", inset: 0, background: "rgba(0,0,0,.65)",
-      display: "flex", alignItems: "center", justifyContent: "center",
-      zIndex: 1000, padding: 20,
-    }} onClick={onClose}>
-      <div style={{
-        background: "var(--bg-surface,#1a2332)", border: "1px solid var(--border)",
-        borderRadius: 16, padding: 28, width: "100%", maxWidth: 560,
-        maxHeight: "85vh", overflowY: "auto",
-      }} onClick={e => e.stopPropagation()}>
+    <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,.65)",
+      display:"flex", alignItems:"center", justifyContent:"center", zIndex:1000, padding:20 }}
+      onClick={onClose}>
+      <div style={{ background:"var(--bg-surface,#1a2332)", border:"1px solid var(--border)",
+        borderRadius:16, padding:28, width:"100%", maxWidth:560, maxHeight:"85vh", overflowY:"auto" }}
+        onClick={e => e.stopPropagation()}>
 
-        {/* Header */}
         <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:20 }}>
           <div style={{ display:"flex", alignItems:"center", gap:12 }}>
-            <span style={{ fontFamily:"var(--font-mono)", fontWeight:700, fontSize:22, color:"var(--accent)" }}>
-              {symbol}
-            </span>
-            {data && <DecisionBadge decision={data.decision} />}
+            <span style={{ fontFamily:"var(--font-mono)", fontWeight:700, fontSize:22, color:"var(--accent)" }}>{symbol}</span>
+            {dec && <DecisionBadge decision={dec as any} />}
           </div>
           <div style={{ display:"flex", gap:8 }}>
-            {onOpenChart && (
-              <button className="btn btn-ghost" style={{ fontSize:12 }}
-                onClick={() => { onOpenChart(symbol); onClose() }}>📈 กราฟ</button>
-            )}
+            {onOpenChart && <button className="btn btn-ghost" style={{ fontSize:12 }}
+              onClick={() => { onOpenChart(symbol); onClose() }}>📈 กราฟ</button>}
             <button onClick={onClose} style={{ background:"transparent", border:"none",
               color:"var(--text-muted)", fontSize:20, cursor:"pointer" }}>✕</button>
           </div>
@@ -61,32 +114,30 @@ function AnalyzePanel({ symbol, onClose, onOpenChart }:
         {loading && <div className="loading-state" style={{ padding:40 }}><div className="loading-spinner" /></div>}
         {error   && <div style={{ color:"var(--red)", fontSize:13 }}>❌ {error}</div>}
 
-        {data && (
+        {data && !loading && (
           <>
-            {/* Score */}
+            {/* Score ring */}
             <div style={{ display:"flex", alignItems:"center", gap:12, marginBottom:20,
               padding:"12px 16px", background:"var(--bg-elevated)", borderRadius:10 }}>
               <div style={{ position:"relative", width:56, height:56, flexShrink:0 }}>
                 <svg width="56" height="56" viewBox="0 0 56 56">
                   <circle cx="28" cy="28" r="23" fill="none" stroke="var(--border)" strokeWidth="4"/>
-                  <circle cx="28" cy="28" r="23" fill="none"
-                    stroke={data.score >= 80?"#00c853": data.score >= 60?"#00e676": data.score >= 40?"#ffd600":"#ff5252"}
-                    strokeWidth="4" strokeLinecap="round"
-                    strokeDasharray={`${(data.score/100)*144.5} 144.5`}
-                    transform="rotate(-90 28 28)" />
+                  <circle cx="28" cy="28" r="23" fill="none" strokeWidth="4" strokeLinecap="round"
+                    stroke={data.score>=80?"#00c853":data.score>=60?"#00e676":data.score>=40?"#ffd600":"#ff5252"}
+                    strokeDasharray={`${(data.score/100)*144.5} 144.5`} transform="rotate(-90 28 28)" />
                 </svg>
                 <span style={{ position:"absolute", inset:0, display:"flex", alignItems:"center",
                   justifyContent:"center", fontWeight:700, fontSize:14 }}>{data.score}</span>
               </div>
-              <div style={{ flex:1, fontSize:13 }}>
+              <div style={{ flex:1, fontSize:13, display:"flex", flexWrap:"wrap", gap:"4px 16px" }}>
                 {[
-                  { label:"Entry",     val: `฿${data.entry?.toLocaleString("th-TH",{minimumFractionDigits:2})}`, color:"var(--green)"  },
-                  { label:"Stop Loss", val: `฿${data.stop_loss?.toLocaleString("th-TH",{minimumFractionDigits:2})}`, color:"var(--red)" },
-                  { label:"Risk",      val: `${data.risk_pct}%`, color:"var(--yellow)" },
-                  { label:"RSI",       val: data.rsi?.toFixed(1) ?? "—", color:"var(--text-primary)" },
-                  { label:"ADX",       val: data.adx?.toFixed(1) ?? "—", color:"var(--text-primary)" },
+                  { label:"Entry",    val:`฿${(data.entry||0).toLocaleString("th-TH",{minimumFractionDigits:2})}`, color:"var(--green)" },
+                  { label:"Stop Loss",val:`฿${(data.stop_loss||0).toLocaleString("th-TH",{minimumFractionDigits:2})}`, color:"var(--red)" },
+                  { label:"Risk",     val:`${data.risk_pct}%`, color:"var(--yellow)" },
+                  { label:"RSI",      val: data.rsi != null ? Number(data.rsi).toFixed(1) : "—", color:"var(--text-primary)" },
+                  { label:"ADX",      val: data.adx != null ? Number(data.adx).toFixed(1) : "—", color:"var(--text-primary)" },
                 ].map(({ label, val, color }) => (
-                  <span key={label} style={{ marginRight:16, display:"inline-flex", gap:4 }}>
+                  <span key={label} style={{ display:"inline-flex", gap:4 }}>
                     <span style={{ color:"var(--text-muted)" }}>{label}:</span>
                     <b style={{ fontFamily:"var(--font-mono)", color }}>{val}</b>
                   </span>
@@ -94,12 +145,10 @@ function AnalyzePanel({ symbol, onClose, onOpenChart }:
               </div>
             </div>
 
-            {/* Score Breakdown */}
+            {/* Breakdown bars */}
             {Object.keys(bd).length > 0 && (
               <div style={{ marginBottom:16 }}>
-                <div style={{ fontSize:12, color:"var(--text-muted)", marginBottom:8, fontWeight:600 }}>
-                  Score Breakdown
-                </div>
+                <div style={{ fontSize:12, color:"var(--text-muted)", marginBottom:8, fontWeight:600 }}>Score Breakdown</div>
                 {[
                   { key:"trend",      label:"Trend",      max:40, color:"#00d4ff" },
                   { key:"momentum",   label:"Momentum",   max:25, color:"#ffd740" },
@@ -114,15 +163,13 @@ function AnalyzePanel({ symbol, onClose, onOpenChart }:
                         <span style={{ fontFamily:"var(--font-mono)", color }}>{v}/{max}</span>
                       </div>
                       <div style={{ height:5, background:"var(--border)", borderRadius:3 }}>
-                        <div style={{ width:`${(v/max)*100}%`, height:"100%", background:color, borderRadius:3 }} />
+                        <div style={{ width:`${Math.min((v/max)*100,100)}%`, height:"100%", background:color, borderRadius:3 }} />
                       </div>
                     </div>
                   )
                 })}
                 {bd.risk_penalty > 0 && (
-                  <div style={{ fontSize:11, color:"var(--red)", marginTop:4 }}>
-                    ⚠️ Risk Penalty: −{bd.risk_penalty}
-                  </div>
+                  <div style={{ fontSize:11, color:"var(--red)", marginTop:4 }}>⚠️ Risk Penalty: −{bd.risk_penalty}</div>
                 )}
               </div>
             )}
@@ -130,14 +177,12 @@ function AnalyzePanel({ symbol, onClose, onOpenChart }:
             {/* Reasons */}
             {data.reasons?.length > 0 && (
               <div>
-                <div style={{ fontSize:12, color:"var(--text-muted)", marginBottom:8, fontWeight:600 }}>
-                  เหตุผล
-                </div>
+                <div style={{ fontSize:12, color:"var(--text-muted)", marginBottom:8, fontWeight:600 }}>เหตุผล</div>
                 <ul style={{ listStyle:"none", padding:0, margin:0, display:"flex", flexDirection:"column", gap:6 }}>
-                  {data.reasons.map((r, i) => (
+                  {data.reasons.map((r: string, i: number) => (
                     <li key={i} style={{ display:"flex", gap:8, fontSize:13,
                       padding:"6px 10px", background:"var(--bg-elevated)", borderRadius:6 }}>
-                      <span style={{ color:"var(--accent)", fontWeight:700, flexShrink:0 }}>✓</span>
+                      <span style={{ color:"var(--accent)", fontWeight:700 }}>✓</span>
                       <span>{r}</span>
                     </li>
                   ))}
@@ -156,15 +201,22 @@ export default function EngineScan({ onOpenChart }: { onOpenChart?: (s: string) 
   const [results, setResults]   = useState<EngineResult[]>([])
   const [loading, setLoading]   = useState(false)
   const [exchange, setExchange] = useState("")
-  const [minScore, setMinScore] = useState(60)
+  const [minScore, setMinScore] = useState(0)      // default 0 = ดูทั้งหมด
   const [topN, setTopN]         = useState(20)
   const [search, setSearch]     = useState("")
   const [selected, setSelected] = useState<string | null>(null)
+  const [days, setDays]         = useState(30)     // ขยาย default เป็น 30 วัน
 
   async function load() {
     setLoading(true)
     try {
-      const res = await engineApi.scan({ exchange: exchange || undefined, top: topN, min_score: minScore })
+      // ส่ง days ผ่าน query param ด้วย
+      const res = await engineApi.scan({
+        exchange:  exchange || undefined,
+        top:       topN,
+        min_score: minScore,
+        days,
+      } as any)
       setResults(res.results || [])
     } catch (e) { console.error(e) }
     setLoading(false)
@@ -172,26 +224,28 @@ export default function EngineScan({ onOpenChart }: { onOpenChart?: (s: string) 
 
   useEffect(() => { load() }, [])
 
-  const filtered = results.filter(r =>
-    !search || r.symbol.includes(search.toUpperCase())
-  )
+  // normalize + filter
+  const filtered = results
+    .map(r => ({ ...r, decision: normalizeDecision(r.decision || "") as any }))
+    .filter(r => !search || r.symbol.includes(search.toUpperCase()))
 
   const DECISION_ORDER = ["STRONG BUY","BUY","HOLD","WATCH","SELL"]
   const DECISION_COLORS: Record<string,string> = {
-    "STRONG BUY":"#00c853", "BUY":"#00e676", "HOLD":"#ffd600", "WATCH":"#29b6f6", "SELL":"#ff5252"
+    "STRONG BUY":"#00c853","BUY":"#00e676","HOLD":"#ffd600","WATCH":"#29b6f6","SELL":"#ff5252"
   }
 
   return (
     <div className="fade-up">
       <div className="page-header">
         <div className="page-title">🔥 Top Opportunities</div>
-        <div className="page-subtitle">Scan ทุกหุ้นด้วย 5-Factor Scoring Engine · คลิกหุ้นเพื่อดู Analysis</div>
+        <div className="page-subtitle">5-Factor Scoring Engine · คลิกหุ้นเพื่อดู Full Analysis</div>
       </div>
       <div className="page-body">
 
         {/* Controls */}
         <div className="card" style={{ marginBottom:20 }}>
           <div style={{ display:"flex", gap:10, flexWrap:"wrap", alignItems:"flex-end" }}>
+
             <div>
               <div style={{ fontSize:11, color:"var(--text-muted)", marginBottom:4 }}>ตลาด</div>
               <select className="filter-select" value={exchange} onChange={e => setExchange(e.target.value)}>
@@ -219,21 +273,37 @@ export default function EngineScan({ onOpenChart }: { onOpenChart?: (s: string) 
             <div>
               <div style={{ fontSize:11, color:"var(--text-muted)", marginBottom:4 }}>Top</div>
               <select className="filter-select" value={topN} onChange={e => setTopN(Number(e.target.value))}>
-                {[10,20,50].map(n => <option key={n} value={n}>Top {n}</option>)}
+                {[10,20,50,100].map(n => <option key={n} value={n}>Top {n}</option>)}
               </select>
             </div>
 
-            <input className="filter-input" placeholder="🔍 ค้นหารหัสหุ้น..."
-              value={search} onChange={e => setSearch(e.target.value)} style={{ minWidth:160 }} />
+            <div>
+              <div style={{ fontSize:11, color:"var(--text-muted)", marginBottom:4 }}>ช่วงเวลา</div>
+              <select className="filter-select" value={days} onChange={e => setDays(Number(e.target.value))}>
+                {[7,14,30,60,90].map(d => <option key={d} value={d}>{d} วัน</option>)}
+              </select>
+            </div>
 
-            <button className="btn btn-primary" onClick={load} disabled={loading} style={{ height:38, minWidth:100 }}>
+            {/* Symbol search with autocomplete */}
+            <div style={{ flex:1, minWidth:200 }}>
+              <div style={{ fontSize:11, color:"var(--text-muted)", marginBottom:4 }}>
+                ค้นหารหัสหุ้น
+                <span style={{ marginLeft:6, fontSize:10, color:"var(--text-muted)", fontWeight:400 }}>
+                  (พิมพ์เพื่อ filter · กด Scan เพื่อค้นหาข้อมูลใหม่)
+                </span>
+              </div>
+              <SymbolSearch value={search} onChange={setSearch} />
+            </div>
+
+            <button className="btn btn-primary" onClick={load} disabled={loading}
+              style={{ height:38, minWidth:100, flexShrink:0 }}>
               {loading ? "⏳..." : "🔍 Scan"}
             </button>
           </div>
         </div>
 
         {/* Summary badges */}
-        {results.length > 0 && (
+        {filtered.length > 0 && (
           <div style={{ display:"flex", gap:10, marginBottom:20, flexWrap:"wrap", alignItems:"center" }}>
             {DECISION_ORDER.map(label => {
               const count = filtered.filter(r => r.decision === label).length
@@ -246,7 +316,7 @@ export default function EngineScan({ onOpenChart }: { onOpenChart?: (s: string) 
               ) : null
             })}
             <span style={{ marginLeft:"auto", fontSize:12, color:"var(--text-muted)" }}>
-              {filtered.length} จาก {results.length} หุ้น
+              แสดง {filtered.length} จาก {results.length} หุ้น ({days} วัน)
             </span>
           </div>
         )}
@@ -257,10 +327,12 @@ export default function EngineScan({ onOpenChart }: { onOpenChart?: (s: string) 
         ) : filtered.length === 0 ? (
           <div className="empty-state">
             <span style={{ fontSize:48 }}>🔍</span>
-            <span>ไม่พบหุ้นที่ตรงเงื่อนไข — ลองปรับ Score ขั้นต่ำ</span>
+            <span>ไม่พบสัญญาณ — ลองขยายช่วงเวลาหรือลด Score ขั้นต่ำ</span>
+            <button className="btn btn-primary" onClick={() => { setMinScore(0); setDays(90); setTimeout(load, 100) }}
+              style={{ marginTop:12 }}>ดูทั้งหมด (90 วัน)</button>
           </div>
         ) : (
-          <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(260px,1fr))", gap:16 }}>
+          <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(260px,1fr))", gap:16 }}>
             {filtered.map(r => (
               <ScoreCard key={r.symbol} data={r} onClick={() => setSelected(r.symbol)} />
             ))}
@@ -268,7 +340,6 @@ export default function EngineScan({ onOpenChart }: { onOpenChart?: (s: string) 
         )}
       </div>
 
-      {/* Analyze Modal */}
       {selected && (
         <AnalyzePanel symbol={selected} onClose={() => setSelected(null)} onOpenChart={onOpenChart} />
       )}
