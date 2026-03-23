@@ -16,29 +16,29 @@ from django.dispatch import receiver
 # ─────────────────────────────────────────────────────────────────────────────
 
 class Profile(models.Model):
-    """
-    เก็บระดับสมาชิก (Tiers) และการตั้งค่าผู้ใช้
-    """
     TIER_CHOICES = [
-        ("FREE", "สมาชิกฟรี (จำกัดการใช้งาน)"),
-        ("PRO",  "สมาชิก Pro (ฟีเจอร์เต็มรูปแบบ)"),
+        ("FREE",    "Free — ทดลองใช้"),
+        ("PRO",     "Pro — ฟีเจอร์เต็ม"),
+        ("PREMIUM", "Premium — ไม่จำกัด"),
     ]
 
+    TIER_LIMITS = {
+        "FREE":    {"watchlist": 3,  "backtest_years": 1, "scanner_top": 20,  "fundamental": False},
+        "PRO":     {"watchlist": 10, "backtest_years": 3, "scanner_top": 100, "fundamental": True},
+        "PREMIUM": {"watchlist": 20, "backtest_years": 5, "scanner_top": 500, "fundamental": True},
+    }
+
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="profile")
-    tier = models.CharField(max_length=10, choices=TIER_CHOICES, default="FREE", verbose_name="ระดับสมาชิก")
-    
-    # ข้อมูลการแจ้งเตือน
-    line_notify_token = models.CharField(max_length=100, blank=True, null=True, verbose_name="Line Notify Token")
-    telegram_chat_id = models.CharField(max_length=50, blank=True, null=True, verbose_name="Telegram Chat ID")
-    
-    # ข้อจำกัด
-    max_strategies = models.IntegerField(default=3, verbose_name="จำนวนสูตรสูงสุด")
-    
+    tier = models.CharField(max_length=10, choices=TIER_CHOICES, default="FREE",
+                            db_index=True, verbose_name="ระดับสมาชิก")
+    line_notify_token = models.CharField(max_length=100, blank=True, null=True)
+    telegram_chat_id  = models.CharField(max_length=50,  blank=True, null=True)
+    max_strategies    = models.IntegerField(default=3)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        verbose_name = "โปรไฟล์ผู้ใช้"
+        verbose_name        = "โปรไฟล์ผู้ใช้"
         verbose_name_plural = "โปรไฟล์ผู้ใช้"
 
     def __str__(self):
@@ -46,16 +46,121 @@ class Profile(models.Model):
 
     @property
     def is_pro(self):
-        return self.tier == "PRO"
+        return self.tier in ("PRO", "PREMIUM")
+
+    @property
+    def is_premium(self):
+        return self.tier == "PREMIUM"
+
+    @property
+    def limits(self):
+        return self.TIER_LIMITS.get(self.tier, self.TIER_LIMITS["FREE"])
+
+    # ── Active subscription ──
+    @property
+    def active_subscription(self):
+        return self.subscriptions.filter(is_active=True).order_by("-end_date").first()
+
+    def sync_tier_from_subscription(self):
+        """อัปเดต tier จาก subscription ที่ active"""
+        sub = self.active_subscription
+        if sub:
+            self.tier = sub.plan.tier
+        else:
+            # superuser ไม่จำกัด
+            if self.user.is_superuser:
+                self.tier = "PREMIUM"
+            else:
+                self.tier = "FREE"
+        self.save(update_fields=["tier", "updated_at"])
+
+
+class SubscriptionPlan(models.Model):
+    """แผนสมาชิกที่ admin สร้างและจัดการได้"""
+    TIER_CHOICES = [
+        ("FREE",    "Free"),
+        ("PRO",     "Pro"),
+        ("PREMIUM", "Premium"),
+    ]
+
+    name        = models.CharField(max_length=50, unique=True, verbose_name="ชื่อแผน")
+    tier        = models.CharField(max_length=10, choices=TIER_CHOICES, verbose_name="ระดับ")
+    price_thb   = models.DecimalField(max_digits=10, decimal_places=2,
+                                      default=0, verbose_name="ราคา (บาท/เดือน)")
+    duration_days = models.IntegerField(default=30, verbose_name="ระยะเวลา (วัน)")
+    is_active   = models.BooleanField(default=True, verbose_name="เปิดใช้งาน")
+    description = models.TextField(blank=True, verbose_name="รายละเอียด")
+    features    = models.JSONField(default=list, blank=True,
+                                   verbose_name="ฟีเจอร์ (JSON list)")
+    created_at  = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name        = "แผนสมาชิก"
+        verbose_name_plural = "แผนสมาชิก"
+        ordering            = ["price_thb"]
+
+    def __str__(self):
+        return f"{self.name} ({self.tier}) ฿{self.price_thb}/เดือน"
+
+
+class Subscription(models.Model):
+    """ประวัติการสมัครสมาชิกของ user"""
+    STATUS_CHOICES = [
+        ("ACTIVE",   "กำลังใช้งาน"),
+        ("EXPIRED",  "หมดอายุ"),
+        ("CANCELLED","ยกเลิก"),
+        ("TRIAL",    "ทดลองใช้"),
+    ]
+
+    profile     = models.ForeignKey(Profile, on_delete=models.CASCADE,
+                                    related_name="subscriptions")
+    plan        = models.ForeignKey(SubscriptionPlan, on_delete=models.PROTECT,
+                                    verbose_name="แผน")
+    status      = models.CharField(max_length=10, choices=STATUS_CHOICES,
+                                   default="ACTIVE", db_index=True, verbose_name="สถานะ")
+    start_date  = models.DateField(verbose_name="วันเริ่ม")
+    end_date    = models.DateField(verbose_name="วันสิ้นสุด", db_index=True)
+    is_active   = models.BooleanField(default=True, db_index=True, verbose_name="Active")
+    payment_ref = models.CharField(max_length=255, blank=True,
+                                   verbose_name="หมายเลขอ้างอิงการชำระ")
+    note        = models.TextField(blank=True, verbose_name="หมายเหตุ (admin)")
+    created_by  = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True,
+                                    related_name="created_subscriptions",
+                                    verbose_name="สร้างโดย admin")
+    created_at  = models.DateTimeField(auto_now_add=True)
+    updated_at  = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name        = "ประวัติสมาชิก"
+        verbose_name_plural = "ประวัติสมาชิก"
+        ordering            = ["-start_date"]
+
+    def __str__(self):
+        return f"{self.profile.user.username} | {self.plan.name} | {self.start_date}→{self.end_date}"
+
+    def save(self, *args, **kwargs):
+        from datetime import date
+        # auto-update is_active
+        if self.end_date < date.today():
+            self.is_active = False
+            self.status    = "EXPIRED"
+        super().save(*args, **kwargs)
+        # sync tier กลับไปที่ profile
+        self.profile.sync_tier_from_subscription()
+
 
 @receiver(post_save, sender=User)
 def create_user_profile(sender, instance, created, **kwargs):
     if created:
-        Profile.objects.create(user=instance)
+        Profile.objects.create(
+            user=instance,
+            tier="PREMIUM" if instance.is_superuser else "FREE",
+        )
 
 @receiver(post_save, sender=User)
 def save_user_profile(sender, instance, **kwargs):
-    instance.profile.save()
+    if hasattr(instance, "profile"):
+        instance.profile.save()
 
 
 # ─────────────────────────────────────────────────────────────────────────────

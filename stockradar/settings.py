@@ -36,6 +36,7 @@ INSTALLED_APPS = [
     "allauth",
     "allauth.account",
     "allauth.socialaccount",
+    "allauth.socialaccount.providers.google",
     "dj_rest_auth",
     "dj_rest_auth.registration",
     # แอปหลัก
@@ -161,9 +162,29 @@ REST_FRAMEWORK = {
 # ---------------------------------------------------------------------------
 
 SITE_ID = 1
-ACCOUNT_EMAIL_VERIFICATION = "none"
-ACCOUNT_LOGIN_METHODS       = {"email"}
-ACCOUNT_SIGNUP_FIELDS       = ["email*", "password1*", "password2*"]
+ACCOUNT_EMAIL_VERIFICATION  = "none"
+ACCOUNT_LOGIN_METHODS        = {"email"}
+ACCOUNT_SIGNUP_FIELDS        = ["email*", "password1*", "password2*"]
+
+# Google OAuth
+SOCIALACCOUNT_PROVIDERS = {
+    "google": {
+        "APP": {
+            "client_id":     os.environ.get("GOOGLE_CLIENT_ID", ""),
+            "secret":        os.environ.get("GOOGLE_CLIENT_SECRET", ""),
+            "key":           "",
+        },
+        "SCOPE":       ["profile", "email"],
+        "AUTH_PARAMS": {"access_type": "online"},
+    }
+}
+SOCIALACCOUNT_AUTO_SIGNUP        = True   # สร้าง user อัตโนมัติ
+SOCIALACCOUNT_EMAIL_REQUIRED     = True
+SOCIALACCOUNT_EMAIL_VERIFICATION = "none"
+AUTHENTICATION_BACKENDS = [
+    "django.contrib.auth.backends.ModelBackend",
+    "allauth.account.auth_backends.AuthenticationBackend",
+]
 
 # ---------------------------------------------------------------------------
 # CORS — อนุญาต React dev server

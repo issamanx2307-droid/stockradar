@@ -1320,3 +1320,117 @@ def economic_calendar_api(request):
         })
     except Exception as e:
         return Response({"error": str(e)}, status=500)
+
+
+# ─── Subscription API ─────────────────────────────────────────────────────────
+
+@api_view(["GET"])
+def subscription_status(request):
+    """
+    GET /api/subscription/ — ดูสถานะ subscription ปัจจุบัน
+    """
+    if not request.user.is_authenticated:
+        from django.contrib.auth.models import User as DU
+        user = DU.objects.filter(is_superuser=True).first()
+        if not user:
+            return Response({"error": "Unauthorized"}, status=401)
+    else:
+        user = request.user
+
+    try:
+        profile = user.profile
+    except Exception:
+        from radar.models import Profile as P
+        profile, _ = P.objects.get_or_create(user=user)
+
+    sub = profile.active_subscription
+    lim = profile.limits
+
+    return Response({
+        "username":    user.username,
+        "email":       user.email,
+        "tier":        profile.tier,
+        "is_pro":      profile.is_pro,
+        "is_premium":  profile.is_premium,
+        "limits":      lim,
+        "subscription": {
+            "plan":       sub.plan.name if sub else None,
+            "status":     sub.status    if sub else "FREE",
+            "start_date": str(sub.start_date) if sub else None,
+            "end_date":   str(sub.end_date)   if sub else None,
+            "days_left":  (sub.end_date - __import__("datetime").date.today()).days if sub else None,
+        } if sub else None,
+    })
+
+
+@api_view(["GET"])
+def subscription_plans(request):
+    """
+    GET /api/subscription/plans/ — รายการแผนทั้งหมด
+    """
+    from radar.models import SubscriptionPlan
+    plans = SubscriptionPlan.objects.filter(is_active=True).order_by("price_thb")
+    TIER_LIMITS = {
+        "FREE":    {"watchlist":3,  "backtest_years":1, "scanner_top":20,  "fundamental":False},
+        "PRO":     {"watchlist":10, "backtest_years":3, "scanner_top":100, "fundamental":True},
+        "PREMIUM": {"watchlist":20, "backtest_years":5, "scanner_top":500, "fundamental":True},
+    }
+    data = []
+    for p in plans:
+        data.append({
+            "id":           p.id,
+            "name":         p.name,
+            "tier":         p.tier,
+            "price_thb":    float(p.price_thb),
+            "duration_days":p.duration_days,
+            "description":  p.description,
+            "features":     p.features,
+            "limits":       TIER_LIMITS.get(p.tier, {}),
+        })
+    return Response({"plans": data})
+
+
+# ─── Subscription API ─────────────────────────────────────────────────────────
+
+@api_view(["GET"])
+def subscription_plans(request):
+    """GET /api/subscription/plans/ — รายการแผนทั้งหมด"""
+    from radar.subscription import PLANS
+    return Response({"plans": PLANS})
+
+
+@api_view(["GET"])
+def subscription_status(request):
+    """GET /api/subscription/status/ — สถานะ plan ของ user ปัจจุบัน"""
+    from radar.subscription import get_user_plan, PLANS
+
+    if not request.user.is_authenticated:
+        plan = PLANS["free"]
+        return Response({
+            "authenticated": False,
+            "plan": plan,
+            "tier": "free",
+            "expires_at": None,
+        })
+
+    plan = get_user_plan(request.user)
+    tier = request.user.profile.tier.lower()
+
+    # หา expiry date
+    expires_at = None
+    try:
+        sub = request.user.profile.subscriptions.filter(
+            is_active=True
+        ).order_by("-end_date").first()
+        if sub:
+            expires_at = sub.end_date.isoformat()
+    except Exception:
+        pass
+
+    return Response({
+        "authenticated": True,
+        "username":  request.user.username,
+        "tier":      tier,
+        "plan":      plan,
+        "expires_at": expires_at,
+    })
