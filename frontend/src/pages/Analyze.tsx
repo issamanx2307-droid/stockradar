@@ -3,7 +3,7 @@
  * วิเคราะห์หุ้นเดียวด้วย Engine ใหม่
  * Score breakdown 5 หมวด + reasons + entry/stop/size
  */
-import { useState } from "react"
+import { useState, useRef } from "react"
 import { engineApi, EngineResult } from "../api/engineApi"
 import DecisionBadge from "../components/DecisionBadge"
 import ScoreCard from "../components/ScoreCard"
@@ -22,12 +22,22 @@ export default function Analyze({ onOpenChart }: { onOpenChart?: (s: string) => 
   const [data, setData]       = useState<EngineResult | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError]     = useState("")
+  // ref เก็บค่า symbol ล่าสุดเสมอ — แก้ closure bug ใน onSelect
+  const symRef = useRef("")
 
-  async function handleAnalyze() {
-    if (!symbol.trim()) return
+  function handleSymbolChange(v: string) {
+    setSymbol(v)
+    symRef.current = v
+  }
+
+  async function handleAnalyze(overrideSym?: string) {
+    // overrideSym มาจาก dropdown click — ใช้ตรงนี้เลยไม่รอ state update
+    const sym = (overrideSym ?? symRef.current).trim().toUpperCase()
+    if (!sym) return
+    if (overrideSym) { setSymbol(overrideSym); symRef.current = overrideSym }
     setLoading(true); setError(""); setData(null)
     try {
-      const res = await engineApi.analyze(symbol.trim().toUpperCase(), capital)
+      const res = await engineApi.analyze(sym, capital)
       setData(res)
     } catch (e: any) {
       setError(e.message || "วิเคราะห์ไม่สำเร็จ")
@@ -51,7 +61,7 @@ export default function Analyze({ onOpenChart }: { onOpenChart?: (s: string) => 
             <div style={{ flex: 1, minWidth: 180 }}>
               <div style={{ fontSize: 11, color: "var(--text-muted)", marginBottom: 4 }}>รหัสหุ้น</div>
               <SymbolInput
-                value={symbol} onChange={setSymbol} onSelect={handleAnalyze}
+                value={symbol} onChange={handleSymbolChange} onSelect={handleAnalyze}
                 placeholder="PTT, KBANK, AAPL..." />
             </div>
             <div style={{ minWidth: 160 }}>

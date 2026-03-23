@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useState, useRef } from "react"
 import { useRadarWS } from "./hooks/useRadarWS"
 import { WsStatus } from "./components/WsStatus"
 import { ScannerProgress } from "./components/ScannerProgress"
@@ -11,7 +11,6 @@ import Profile from "./pages/Profile"
 import Contact from "./pages/Contact"
 import Guide from "./pages/Guide"
 import Qna from "./pages/Qna"
-import PositionAnalysis from "./pages/PositionAnalysis"
 import News from "./pages/News"
 import Analyze from "./pages/Analyze"
 import EngineScan from "./pages/EngineScan"
@@ -32,7 +31,6 @@ const NAV_ITEMS = [
   // ── วิเคราะห์ ──
   { id: "analyze",      label: "วิเคราะห์หุ้น",     icon: "🔬" },
   { id: "fundamental",  label: "Fundamental",         icon: "📊" },
-  { id: "position",     label: "วิเคราะห์ตำแหน่ง",  icon: "📌" },
   { id: "portfolio",   label: "Portfolio",           icon: "💼" },
   // ── เครื่องมือ ──
   { id: "scanner",     label: "สแกนหุ้น",           icon: "🔍" },
@@ -123,7 +121,6 @@ export default function App() {
           {page === "news"        && <News onOpenChart={openChart} />}
           {page === "analyze"      && <Analyze onOpenChart={openChart} />}
           {page === "fundamental"  && <Fundamental onOpenChart={openChart} />}
-          {page === "position"     && <PositionAnalysis />}
           {page === "portfolio"   && <Portfolio onOpenChart={openChart} />}
           {page === "scanner"     && <Scanner onOpenChart={openChart} />}
           {page === "signals"     && <Signals onOpenChart={openChart} />}
