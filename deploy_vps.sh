@@ -39,10 +39,10 @@ if [ ! -f .env ]; then
 cat > .env << 'ENVEOF'
 DJANGO_SECRET_KEY=CHANGE_THIS_TO_RANDOM_SECRET_KEY
 DEBUG=False
-ALLOWED_HOSTS=187.127.107.228,srv1522191.hstgr.cloud
+ALLOWED_HOSTS=187.127.107.228,srv1522191.hstgr.cloud,radarhoon.com,www.radarhoon.com
 DATABASE_URL=sqlite:////opt/stockradar/db.sqlite3
 REDIS_URL=
-CORS_ORIGINS=http://187.127.107.228
+CORS_ORIGINS=https://radarhoon.com,http://www.radarhoon.com,http://187.127.107.228
 GOOGLE_CLIENT_ID=604864460946-q4bcklavlc972jsc6ifsj59ll9760usp.apps.googleusercontent.com
 GOOGLE_CLIENT_SECRET=
 ENVEOF
@@ -97,7 +97,7 @@ npm ci && npm run build
 cat > /etc/nginx/sites-available/stockradar << 'NGINXEOF'
 server {
     listen 80;
-    server_name 187.127.107.228 srv1522191.hstgr.cloud;
+    server_name 187.127.107.228 srv1522191.hstgr.cloud radarhoon.com www.radarhoon.com;
 
     # React frontend
     root /opt/stockradar/frontend/dist;
