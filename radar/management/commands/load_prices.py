@@ -30,54 +30,154 @@ def get_yahoo_ticker(symbol: str, exchange: str) -> str:
     return symbol                   # US: AAPL, MSFT ฯลฯ
 
 
-def _make_session():
-    """สร้าง requests.Session พร้อม browser headers เพื่อเลี่ยง Yahoo Finance block"""
+_YF_SESSION = None   # shared session + crumb cache
+
+
+def _get_yf_session():
+    """
+    สร้าง session พร้อม cookie + crumb จาก Yahoo Finance จริงๆ
+    ทำให้ request ผ่านได้แม้อยู่บน VPS
+    """
+    global _YF_SESSION
     import requests
+
     session = requests.Session()
     session.headers.update({
         "User-Agent": (
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
             "AppleWebKit/537.36 (KHTML, like Gecko) "
-            "Chrome/120.0.0.0 Safari/537.36"
+            "Chrome/124.0.0.0 Safari/537.36"
         ),
         "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-        "Accept-Language": "en-US,en;q=0.5",
+        "Accept-Language": "en-US,en;q=0.9",
         "Accept-Encoding": "gzip, deflate, br",
         "Connection": "keep-alive",
+        "Referer": "https://finance.yahoo.com/",
     })
-    return session
+
+    # ขอ cookie จาก Yahoo Finance homepage
+    try:
+        session.get("https://finance.yahoo.com", timeout=10)
+    except Exception:
+        pass
+
+    # ขอ crumb
+    crumb = None
+    try:
+        r = session.get(
+            "https://query2.finance.yahoo.com/v1/test/getcrumb",
+            timeout=10,
+        )
+        if r.status_code == 200 and r.text and "<" not in r.text:
+            crumb = r.text.strip()
+    except Exception:
+        pass
+
+    _YF_SESSION = (session, crumb)
+    return session, crumb
+
+
+def _fetch_yahoo_direct(ticker: str, start: date, end: date) -> "pd.DataFrame | None":
+    """ดึงข้อมูลจาก Yahoo Finance Chart API โดยตรง (ไม่ผ่าน yfinance library)"""
+    import requests
+
+    session, crumb = _get_yf_session()
+    start_ts = int(time.mktime(start.timetuple()))
+    end_ts   = int(time.mktime(end.timetuple())) + 86400
+
+    url = (
+        f"https://query1.finance.yahoo.com/v8/finance/chart/{ticker}"
+        f"?period1={start_ts}&period2={end_ts}&interval=1d&events=history"
+    )
+    if crumb:
+        url += f"&crumb={crumb}"
+
+    for attempt in range(3):
+        try:
+            r = session.get(url, timeout=15)
+            if r.status_code != 200:
+                time.sleep(2 ** attempt)
+                continue
+            data = r.json()
+            result = data.get("chart", {}).get("result")
+            if not result:
+                break
+            result = result[0]
+            timestamps = result.get("timestamp", [])
+            ohlcv = result.get("indicators", {}).get("quote", [{}])[0]
+            adjclose = result.get("indicators", {}).get("adjclose", [{}])[0].get("adjclose", [])
+
+            rows = []
+            for i, ts in enumerate(timestamps):
+                try:
+                    close = adjclose[i] if adjclose else ohlcv.get("close", [])[i]
+                    if close is None:
+                        continue
+                    rows.append({
+                        "date":   date.fromtimestamp(ts),
+                        "open":   Decimal(str(round(float(ohlcv.get("open",  [])[i] or close), 4))),
+                        "high":   Decimal(str(round(float(ohlcv.get("high",  [])[i] or close), 4))),
+                        "low":    Decimal(str(round(float(ohlcv.get("low",   [])[i] or close), 4))),
+                        "close":  Decimal(str(round(float(close), 4))),
+                        "volume": int(ohlcv.get("volume", [])[i] or 0),
+                    })
+                except (IndexError, TypeError):
+                    continue
+            return rows
+        except Exception:
+            time.sleep(2 ** attempt)
+
+    return None
+
+
+def _fetch_stooq(ticker: str, start: date, end: date) -> list | None:
+    """
+    Fallback: ดึงข้อมูลจาก Stooq.com (ฟรี ไม่ต้องการ API key ไม่บล็อก VPS)
+    Ticker format: AAPL.US, MSFT.US, PTT.BK
+    """
+    try:
+        import pandas_datareader.data as web
+        # แปลง ticker format: AAPL → AAPL.US, PTT.BK → PTT.BK
+        stooq_ticker = ticker if "." in ticker else f"{ticker}.US"
+        df = web.DataReader(stooq_ticker, "stooq", start=start, end=end)
+        if df is None or df.empty:
+            return None
+        df = df.sort_index()
+        rows = []
+        for idx, row in df.iterrows():
+            close = row.get("Close")
+            if close is None or float(close) == 0:
+                continue
+            rows.append({
+                "date":   idx.date() if hasattr(idx, "date") else idx,
+                "open":   Decimal(str(round(float(row.get("Open",  close)), 4))),
+                "high":   Decimal(str(round(float(row.get("High",  close)), 4))),
+                "low":    Decimal(str(round(float(row.get("Low",   close)), 4))),
+                "close":  Decimal(str(round(float(close), 4))),
+                "volume": int(row["Volume"]) if "Volume" in row and not pd.isna(row["Volume"]) else 0,
+            })
+        return rows if rows else None
+    except Exception:
+        return None
 
 
 def fetch_prices_batch(tickers: list[str], start: date, end: date) -> dict:
     """
-    ดึงราคาหุ้นทีละตัว ด้วย browser session เพื่อเลี่ยง Yahoo Finance block
-    คืนค่า dict {ticker: rows_list}
+    ดึงราคาหุ้นทีละตัว
+    1. ลอง Yahoo Finance Chart API โดยตรง (cookie + crumb)
+    2. ถ้าล้มเหลว → fallback ไป Stooq
     """
-    import yfinance as yf
-
     if not tickers:
         return {}
 
-    session = _make_session()
     results = {}
-
     for ticker in tickers:
-        for attempt in range(3):   # retry 3 ครั้ง
-            try:
-                t = yf.Ticker(ticker, session=session)
-                df = t.history(
-                    start=start.strftime("%Y-%m-%d"),
-                    end=end.strftime("%Y-%m-%d"),
-                    auto_adjust=True,
-                    actions=False,
-                )
-                if df is not None and not df.empty:
-                    results[ticker] = _process_df_rows(df)
-                break   # สำเร็จ ออกจาก retry loop
-            except Exception:
-                if attempt < 2:
-                    time.sleep(2 ** attempt)   # exponential backoff: 1s, 2s
-                continue
+        rows = _fetch_yahoo_direct(ticker, start, end)
+        if not rows:
+            rows = _fetch_stooq(ticker, start, end)
+        if rows:
+            results[ticker] = rows
+        time.sleep(0.3)   # ป้องกัน rate limit
 
     return results
 
