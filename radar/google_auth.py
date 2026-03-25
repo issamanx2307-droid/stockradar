@@ -79,6 +79,21 @@ def google_login(request):
         from radar.models import Profile
         profile = Profile.objects.create(user=user, tier="FREE")
 
+    # บันทึกข้อมูล Google ลง Profile เสมอ (อัปเดต picture ถ้า login ซ้ำ)
+    update_fields = []
+    if google_id and profile.google_id != google_id:
+        profile.google_id = google_id
+        update_fields.append("google_id")
+    if picture and profile.picture_url != picture:
+        profile.picture_url = picture
+        update_fields.append("picture_url")
+    if not profile.login_via_google:
+        profile.login_via_google = True
+        update_fields.append("login_via_google")
+    if update_fields:
+        update_fields.append("updated_at")
+        profile.save(update_fields=update_fields)
+
     # สร้าง/ดึง Token
     token, _ = Token.objects.get_or_create(user=user)
 
@@ -86,7 +101,7 @@ def google_login(request):
     from radar.subscription import get_user_plan
     plan = get_user_plan(user)
 
-    logger.info("Google login: %s (new=%s tier=%s)", email, created, profile.tier)
+    logger.info("Google login: %s (new=%s tier=%s google_id=%s)", email, created, profile.tier, google_id)
 
     return Response({
         "token":   token.key,

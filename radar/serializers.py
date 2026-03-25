@@ -10,8 +10,11 @@ class BusinessProfileSerializer(serializers.ModelSerializer):
 class ProfileSerializer(serializers.ModelSerializer):
     class Meta:
         model = Profile
-        fields = ["tier", "line_notify_token", "telegram_chat_id", "max_strategies", "is_pro"]
-        read_only_fields = ["tier", "max_strategies", "is_pro"]
+        fields = [
+            "tier", "line_notify_token", "telegram_chat_id", "max_strategies",
+            "is_pro", "picture_url", "login_via_google",
+        ]
+        read_only_fields = ["tier", "max_strategies", "is_pro", "picture_url", "login_via_google"]
 
 class UserSerializer(serializers.ModelSerializer):
     profile = ProfileSerializer(read_only=True)

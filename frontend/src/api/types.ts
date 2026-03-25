@@ -74,11 +74,13 @@ export interface DashboardStats {
 }
 
 export interface ProfileInfo {
-  tier: "FREE" | "PRO";
+  tier: "FREE" | "PRO" | "PREMIUM";
   line_notify_token?: string;
   telegram_chat_id?: string;
   max_strategies: number;
   is_pro: boolean;
+  picture_url?: string;
+  login_via_google?: boolean;
 }
 
 export interface UserInfo {

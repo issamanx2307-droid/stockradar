@@ -1,0 +1,868 @@
+/**
+ * pages/LandingPage.tsx
+ * Landing page สำหรับ radarhoon.com
+ * — Hero / Features / News (auto-update 5 นาที) / Pricing / Footer
+ * — TickerTape ดัชนีวิ่งด้านล่าง
+ */
+import { useState, useEffect, useRef } from "react"
+import { useAuth } from "../context/AuthContext"
+import { API_BASE } from "../api/config"
+import TickerTape from "../components/TickerTape"
+
+const GOOGLE_CLIENT_ID = (import.meta as any).env.VITE_GOOGLE_CLIENT_ID || ""
+
+declare global {
+  interface Window { google?: any; handleGoogleCredential?: (r: any) => void }
+}
+
+// ── News types ────────────────────────────────────────────────────────────────
+interface NewsItem {
+  id: number
+  title: string
+  summary?: string
+  url?: string
+  source?: string
+  sentiment?: string
+  sentiment_score?: number
+  published_at?: string
+  related_symbols?: string[]
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function timeAgo(dateStr?: string): string {
+  if (!dateStr) return ""
+  const d = new Date(dateStr)
+  const diff = (Date.now() - d.getTime()) / 1000
+  if (diff < 60) return "เมื่อกี้"
+  if (diff < 3600) return `${Math.floor(diff / 60)} นาทีที่แล้ว`
+  if (diff < 86400) return `${Math.floor(diff / 3600)} ชั่วโมงที่แล้ว`
+  return `${Math.floor(diff / 86400)} วันที่แล้ว`
+}
+
+function sentimentColor(s?: string) {
+  if (s === "BULLISH") return "#00e676"
+  if (s === "BEARISH") return "#ff5252"
+  return "#ffd740"
+}
+function sentimentLabel(s?: string) {
+  if (s === "BULLISH") return "บวก"
+  if (s === "BEARISH") return "ลบ"
+  return "กลาง"
+}
+
+// ── Sub-components ─────────────────────────────────────────────────────────────
+function StatCard({ value, label, color = "#00d4ff" }: { value: string; label: string; color?: string }) {
+  return (
+    <div style={{
+      textAlign: "center", padding: "24px 20px",
+      background: "rgba(255,255,255,.03)",
+      border: "1px solid rgba(255,255,255,.06)",
+      borderRadius: 16, flex: 1, minWidth: 140,
+    }}>
+      <div style={{ fontSize: 32, fontWeight: 800, color, letterSpacing: -1 }}>{value}</div>
+      <div style={{ fontSize: 13, color: "#7a90a8", marginTop: 6 }}>{label}</div>
+    </div>
+  )
+}
+
+function FeatureCard({ icon, title, desc }: { icon: string; title: string; desc: string }) {
+  return (
+    <div style={{
+      padding: "28px 24px",
+      background: "rgba(255,255,255,.03)",
+      border: "1px solid rgba(255,255,255,.07)",
+      borderRadius: 16,
+      transition: "border-color .2s, transform .2s",
+    }}
+      onMouseEnter={e => {
+        (e.currentTarget as HTMLElement).style.borderColor = "rgba(0,212,255,.4)"
+        ;(e.currentTarget as HTMLElement).style.transform = "translateY(-3px)"
+      }}
+      onMouseLeave={e => {
+        (e.currentTarget as HTMLElement).style.borderColor = "rgba(255,255,255,.07)"
+        ;(e.currentTarget as HTMLElement).style.transform = "translateY(0)"
+      }}
+    >
+      <div style={{ fontSize: 36, marginBottom: 14 }}>{icon}</div>
+      <div style={{ fontSize: 16, fontWeight: 700, color: "#e2e8f0", marginBottom: 10 }}>{title}</div>
+      <div style={{ fontSize: 14, color: "#6a8099", lineHeight: 1.7 }}>{desc}</div>
+    </div>
+  )
+}
+
+function PlanCard({
+  name, thaiName, price, color, features, highlight, btnId,
+}: {
+  name: string; thaiName: string; price: string; color: string
+  features: string[]; highlight?: boolean; btnId: string
+}) {
+  return (
+    <div style={{
+      flex: 1, minWidth: 240,
+      padding: "32px 28px",
+      background: highlight ? `rgba(0,212,255,.07)` : "rgba(255,255,255,.03)",
+      border: `1px solid ${highlight ? "rgba(0,212,255,.5)" : "rgba(255,255,255,.07)"}`,
+      borderRadius: 20,
+      position: "relative",
+      transition: "transform .2s",
+    }}>
+      {highlight && (
+        <div style={{
+          position: "absolute", top: -14, left: "50%", transform: "translateX(-50%)",
+          background: "#00d4ff", color: "#0a0e17",
+          fontSize: 11, fontWeight: 800, padding: "4px 16px",
+          borderRadius: 20, letterSpacing: 1, whiteSpace: "nowrap",
+        }}>
+          ยอดนิยม
+        </div>
+      )}
+      <div style={{ fontSize: 13, color, fontWeight: 700, letterSpacing: 1, marginBottom: 4 }}>{name}</div>
+      <div style={{ fontSize: 18, fontWeight: 700, color: "#e2e8f0", marginBottom: 4 }}>{thaiName}</div>
+      <div style={{ fontSize: 28, fontWeight: 800, color, marginBottom: 20 }}>{price}</div>
+      <div style={{ marginBottom: 24 }}>
+        {features.map((f, i) => (
+          <div key={i} style={{
+            display: "flex", alignItems: "center", gap: 8,
+            padding: "6px 0", fontSize: 13, color: "#a0b4c8",
+            borderBottom: "1px solid rgba(255,255,255,.05)",
+          }}>
+            <span style={{ color, fontSize: 10 }}>✦</span> {f}
+          </div>
+        ))}
+      </div>
+      <div id={btnId} style={{ display: "flex", justifyContent: "center" }} />
+    </div>
+  )
+}
+
+// ── Main Component ─────────────────────────────────────────────────────────────
+export default function LandingPage() {
+  const { loginWithGoogle } = useAuth()
+  const [error, setError] = useState("")
+  const [loginLoading, setLoginLoading] = useState(false)
+  const [news, setNews] = useState<NewsItem[]>([])
+  const [newsLoading, setNewsLoading] = useState(true)
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const heroRef = useRef<HTMLDivElement>(null)
+
+  // ── Google login init ───────────────────────────────────────────────────────
+  useEffect(() => {
+    if (!GOOGLE_CLIENT_ID) return
+    const script = document.createElement("script")
+    script.src = "https://accounts.google.com/gsi/client"
+    script.async = true
+    script.onload = initGoogle
+    document.head.appendChild(script)
+    return () => { document.head.removeChild(script) }
+  }, [])
+
+  function initGoogle() {
+    if (!window.google || !GOOGLE_CLIENT_ID) return
+    window.handleGoogleCredential = async (resp: any) => {
+      setLoginLoading(true); setError("")
+      try { await loginWithGoogle(resp.credential) }
+      catch (e: any) { setError(e.message || "Login ล้มเหลว กรุณาลองใหม่") }
+      setLoginLoading(false)
+    }
+    window.google.accounts.id.initialize({
+      client_id: GOOGLE_CLIENT_ID,
+      callback: window.handleGoogleCredential,
+    })
+    // render ปุ่ม login ทุก container
+    ;["google-btn-hero", "google-btn-cta"].forEach(id => {
+      const el = document.getElementById(id)
+      if (el) {
+        window.google!.accounts.id.renderButton(el, {
+          theme: "filled_black", size: "large",
+          text: "signin_with", shape: "pill", locale: "th", width: 260,
+        })
+      }
+    })
+  }
+
+  // ── News fetch (auto-update ทุก 5 นาที) ─────────────────────────────────────
+  useEffect(() => {
+    let cancelled = false
+    async function loadNews() {
+      try {
+        const res = await fetch(`${API_BASE}/news/?days=1&limit=6`)
+        const d = await res.json()
+        if (!cancelled) {
+          const items: NewsItem[] = d.results ?? d.news ?? d ?? []
+          setNews(items.slice(0, 6))
+        }
+      } catch {
+        // ไม่มีข่าว ไม่แสดง error
+      }
+      if (!cancelled) setNewsLoading(false)
+    }
+    loadNews()
+    const iv = setInterval(loadNews, 5 * 60 * 1000)
+    return () => { cancelled = true; clearInterval(iv) }
+  }, [])
+
+  // ── Scroll-spy animation (Intersection Observer) ─────────────────────────────
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      entries => entries.forEach(e => {
+        if (e.isIntersecting) e.target.classList.add("lp-visible")
+      }),
+      { threshold: 0.12 }
+    )
+    document.querySelectorAll(".lp-fade").forEach(el => observer.observe(el))
+    return () => observer.disconnect()
+  }, [])
+
+  const noGoogleId = !GOOGLE_CLIENT_ID
+
+  return (
+    <div style={{ fontFamily: "'IBM Plex Sans Thai', sans-serif", background: "#080d18", color: "#e2e8f0", minHeight: "100vh" }}>
+
+      {/* ── CSS ─────────────────────────────────────────────────── */}
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@300;400;500;600;700;800&display=swap');
+        .lp-fade { opacity: 0; transform: translateY(28px); transition: opacity .6s ease, transform .6s ease; }
+        .lp-visible { opacity: 1 !important; transform: translateY(0) !important; }
+        .lp-fade-delay-1 { transition-delay: .1s; }
+        .lp-fade-delay-2 { transition-delay: .2s; }
+        .lp-fade-delay-3 { transition-delay: .3s; }
+        .lp-fade-delay-4 { transition-delay: .4s; }
+        @keyframes heroFloat {
+          0%,100% { transform: translateY(0px); }
+          50%      { transform: translateY(-12px); }
+        }
+        @keyframes glowPulse {
+          0%,100% { opacity: .25; }
+          50%      { opacity: .55; }
+        }
+        @keyframes spinSlow {
+          from { transform: rotate(0deg); }
+          to   { transform: rotate(360deg); }
+        }
+        @keyframes blinkDot {
+          0%,100% { opacity:1; } 50% { opacity:.2; }
+        }
+        .hero-glow {
+          position: absolute; border-radius: 50%;
+          background: radial-gradient(circle, rgba(0,212,255,.35) 0%, transparent 70%);
+          animation: glowPulse 4s ease-in-out infinite;
+          pointer-events: none;
+        }
+        .lp-nav-link {
+          color: #7a90a8; font-size: 14px; text-decoration: none;
+          transition: color .2s; cursor: pointer; background: none; border: none;
+        }
+        .lp-nav-link:hover { color: #00d4ff; }
+        .lp-btn-primary {
+          background: linear-gradient(135deg, #00d4ff, #0090cc);
+          color: #0a0e17; border: none; border-radius: 50px;
+          padding: 12px 28px; font-size: 15px; font-weight: 700;
+          cursor: pointer; transition: transform .15s, box-shadow .15s;
+          box-shadow: 0 4px 20px rgba(0,212,255,.3);
+        }
+        .lp-btn-primary:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 8px 28px rgba(0,212,255,.45);
+        }
+        .lp-section { padding: 80px 0; }
+        .lp-container { max-width: 1140px; margin: 0 auto; padding: 0 24px; }
+        .news-card {
+          padding: 18px 20px;
+          background: rgba(255,255,255,.03);
+          border: 1px solid rgba(255,255,255,.07);
+          border-radius: 12px;
+          transition: border-color .2s, background .2s;
+          text-decoration: none;
+          display: block;
+        }
+        .news-card:hover {
+          border-color: rgba(0,212,255,.3);
+          background: rgba(0,212,255,.04);
+        }
+        @media (max-width: 768px) {
+          .lp-hero-title { font-size: 36px !important; }
+          .lp-grid-4 { grid-template-columns: repeat(2, 1fr) !important; }
+          .lp-grid-3 { grid-template-columns: 1fr !important; }
+          .lp-flex-plans { flex-direction: column !important; }
+          .lp-hide-mobile { display: none !important; }
+          .lp-stats-flex { flex-wrap: wrap !important; }
+        }
+      `}</style>
+
+      {/* ── NAVBAR ─────────────────────────────────────────────────── */}
+      <nav style={{
+        position: "fixed", top: 0, left: 0, right: 0, zIndex: 999,
+        background: "rgba(8,13,24,.85)", backdropFilter: "blur(12px)",
+        borderBottom: "1px solid rgba(255,255,255,.07)",
+        padding: "0 24px", height: 62,
+        display: "flex", alignItems: "center", justifyContent: "space-between",
+      }}>
+        {/* Logo */}
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <span style={{ fontSize: 26, color: "#00d4ff", lineHeight: 1 }}>◈</span>
+          <div>
+            <span style={{ fontSize: 18, fontWeight: 800, color: "#e2e8f0" }}>Radar</span>
+            <span style={{ fontSize: 18, fontWeight: 800, color: "#00d4ff" }}>หุ้น</span>
+          </div>
+          <span style={{
+            fontSize: 9, fontWeight: 700, color: "#00d4ff",
+            background: "rgba(0,212,255,.12)", border: "1px solid rgba(0,212,255,.3)",
+            borderRadius: 4, padding: "1px 6px", letterSpacing: 1, alignSelf: "flex-end", marginBottom: 2,
+          }}>
+            AI
+          </span>
+        </div>
+
+        {/* Nav links */}
+        <div className="lp-hide-mobile" style={{ display: "flex", alignItems: "center", gap: 28 }}>
+          {[
+            ["#features", "ฟีเจอร์"], ["#news", "ข่าวตลาด"], ["#pricing", "ราคา"],
+          ].map(([href, label]) => (
+            <a key={href} href={href} className="lp-nav-link">{label}</a>
+          ))}
+        </div>
+
+        {/* CTA */}
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <div
+            style={{
+              fontSize: 10, fontWeight: 700, color: "#00e676",
+              animation: "blinkDot 2s ease-in-out infinite",
+              display: "flex", alignItems: "center", gap: 5,
+            }}
+            className="lp-hide-mobile"
+          >
+            <span>●</span> LIVE
+          </div>
+          {noGoogleId ? (
+            <span style={{ fontSize: 12, color: "#ff5252" }}>VITE_GOOGLE_CLIENT_ID missing</span>
+          ) : (
+            <div id="google-btn-nav" style={{ transform: "scale(.85)", transformOrigin: "right center" }}>
+              {/* rendered by GSI */}
+            </div>
+          )}
+        </div>
+      </nav>
+
+      {/* ── HERO ─────────────────────────────────────────────────────── */}
+      <section ref={heroRef} style={{
+        position: "relative", overflow: "hidden",
+        minHeight: "100vh", display: "flex", alignItems: "center",
+        paddingTop: 62,
+      }}>
+        {/* Background glows */}
+        <div className="hero-glow" style={{ width: 600, height: 600, top: -100, left: -150 }} />
+        <div className="hero-glow" style={{ width: 400, height: 400, bottom: 0, right: -80, animationDelay: "2s" }} />
+
+        {/* Grid pattern overlay */}
+        <div style={{
+          position: "absolute", inset: 0,
+          backgroundImage: "linear-gradient(rgba(0,212,255,.03) 1px, transparent 1px), linear-gradient(90deg, rgba(0,212,255,.03) 1px, transparent 1px)",
+          backgroundSize: "60px 60px",
+          pointerEvents: "none",
+        }} />
+
+        <div className="lp-container" style={{ position: "relative", zIndex: 1, padding: "80px 24px" }}>
+          <div style={{ maxWidth: 700 }}>
+
+            {/* Badge */}
+            <div className="lp-fade" style={{
+              display: "inline-flex", alignItems: "center", gap: 8,
+              background: "rgba(0,212,255,.08)", border: "1px solid rgba(0,212,255,.25)",
+              borderRadius: 50, padding: "6px 16px", marginBottom: 28,
+              fontSize: 13, color: "#00d4ff",
+            }}>
+              <span style={{ animation: "blinkDot 1.5s ease-in-out infinite", fontSize: 8 }}>●</span>
+              ระบบวิเคราะห์หุ้น AI — อัปเดตทุกวัน
+            </div>
+
+            {/* Headline */}
+            <h1 className="lp-fade lp-fade-delay-1 lp-hero-title" style={{
+              fontSize: 52, fontWeight: 800, lineHeight: 1.2,
+              margin: "0 0 20px", letterSpacing: -1.5,
+            }}>
+              วิเคราะห์หุ้นอย่าง{" "}
+              <span style={{
+                color: "transparent",
+                backgroundImage: "linear-gradient(135deg, #00d4ff, #00e676)",
+                WebkitBackgroundClip: "text",
+                backgroundClip: "text",
+              }}>
+                มืออาชีพ
+              </span>
+              <br />ด้วย AI-Powered Engine
+            </h1>
+
+            {/* Subheadline */}
+            <p className="lp-fade lp-fade-delay-2" style={{
+              fontSize: 18, color: "#7a90a8", lineHeight: 1.8,
+              margin: "0 0 36px", maxWidth: 560,
+            }}>
+              สแกนกว่า <strong style={{ color: "#e2e8f0" }}>10,000+ หุ้น</strong> ทั่วโลก — ตลาดหุ้นไทย (SET) และ US Market
+              พร้อมสัญญาณซื้อขายจาก <strong style={{ color: "#e2e8f0" }}>5-Factor Engine</strong> และข้อมูล Fundamental แบบเรียลไทม์
+            </p>
+
+            {/* Feature pills */}
+            <div className="lp-fade lp-fade-delay-2" style={{
+              display: "flex", flexWrap: "wrap", gap: 10, marginBottom: 44,
+            }}>
+              {[
+                "📡 สัญญาณซื้อขาย", "🔥 Top Opportunities", "📊 Backtest",
+                "💼 Portfolio Tracker", "📰 ข่าว & Sentiment",
+              ].map(f => (
+                <span key={f} style={{
+                  padding: "6px 14px", borderRadius: 20,
+                  background: "rgba(255,255,255,.05)",
+                  border: "1px solid rgba(255,255,255,.1)",
+                  fontSize: 13, color: "#a0b4c8",
+                }}>
+                  {f}
+                </span>
+              ))}
+            </div>
+
+            {/* CTA */}
+            <div className="lp-fade lp-fade-delay-3" style={{ display: "flex", flexDirection: "column", gap: 14, alignItems: "flex-start" }}>
+              {noGoogleId ? (
+                <div style={{
+                  padding: "14px 20px", background: "rgba(255,82,82,.1)",
+                  border: "1px solid rgba(255,82,82,.3)", borderRadius: 12,
+                  fontSize: 13, color: "#ff5252",
+                }}>
+                  ⚠️ กรุณาตั้งค่า VITE_GOOGLE_CLIENT_ID ใน .env.local
+                </div>
+              ) : (
+                <div>
+                  <div id="google-btn-hero" style={{ marginBottom: 8 }} />
+                  {loginLoading && <div style={{ fontSize: 13, color: "#00d4ff" }}>⏳ กำลังเข้าสู่ระบบ...</div>}
+                  {error && <div style={{ fontSize: 12, color: "#ff5252" }}>❌ {error}</div>}
+                </div>
+              )}
+              <div style={{ fontSize: 12, color: "#4a5a70" }}>
+                ✓ สมัครฟรี  ✓ ไม่ต้องใส่บัตรเครดิต  ✓ เริ่มใช้งานทันที
+              </div>
+            </div>
+          </div>
+
+          {/* Floating card (desktop) */}
+          <div className="lp-hide-mobile" style={{
+            position: "absolute", right: 24, top: "50%", transform: "translateY(-50%)",
+            width: 300,
+          }}>
+            <div style={{
+              background: "rgba(17,24,39,.9)", backdropFilter: "blur(12px)",
+              border: "1px solid rgba(0,212,255,.2)",
+              borderRadius: 20, padding: 24,
+              animation: "heroFloat 5s ease-in-out infinite",
+              boxShadow: "0 20px 60px rgba(0,0,0,.5), 0 0 40px rgba(0,212,255,.08)",
+            }}>
+              <div style={{ fontSize: 12, color: "#6a8099", marginBottom: 16, letterSpacing: 1 }}>
+                TOP OPPORTUNITIES — วันนี้
+              </div>
+              {[
+                { sym: "PTT", score: 92, dir: "BUY", chg: "+2.4%" },
+                { sym: "ADVANC", score: 87, dir: "BUY", chg: "+1.8%" },
+                { sym: "CPALL", score: 81, dir: "WATCH", chg: "+0.9%" },
+                { sym: "AAPL", score: 95, dir: "BUY", chg: "+3.1%" },
+                { sym: "NVDA", score: 91, dir: "BUY", chg: "+4.5%" },
+              ].map((s, i) => (
+                <div key={i} style={{
+                  display: "flex", alignItems: "center", justifyContent: "space-between",
+                  padding: "8px 0", borderBottom: "1px solid rgba(255,255,255,.05)",
+                  fontSize: 13,
+                }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <span style={{
+                      width: 22, height: 22, borderRadius: 6,
+                      background: i < 2 ? "rgba(0,230,118,.12)" : "rgba(255,215,64,.1)",
+                      border: `1px solid ${i < 2 ? "rgba(0,230,118,.3)" : "rgba(255,215,64,.3)"}`,
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                      fontSize: 9, color: i < 2 ? "#00e676" : "#ffd740", fontWeight: 700,
+                    }}>
+                      {s.score}
+                    </span>
+                    <span style={{ fontWeight: 600 }}>{s.sym}</span>
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <span style={{
+                      fontSize: 10, padding: "2px 8px", borderRadius: 4,
+                      background: s.dir === "BUY" ? "rgba(0,230,118,.12)" : "rgba(255,215,64,.1)",
+                      color: s.dir === "BUY" ? "#00e676" : "#ffd740",
+                      fontWeight: 700, letterSpacing: .5,
+                    }}>{s.dir}</span>
+                    <span style={{ color: "#00e676", fontFamily: "monospace", fontSize: 12 }}>{s.chg}</span>
+                  </div>
+                </div>
+              ))}
+              <div style={{ marginTop: 14, fontSize: 11, color: "#4a5a70", textAlign: "center" }}>
+                * ข้อมูลจำลองสำหรับแสดงตัวอย่าง
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ── STATS ───────────────────────────────────────────────────── */}
+      <section style={{ padding: "40px 0", borderTop: "1px solid rgba(255,255,255,.05)", borderBottom: "1px solid rgba(255,255,255,.05)" }}>
+        <div className="lp-container">
+          <div className="lp-fade lp-stats-flex" style={{ display: "flex", gap: 16 }}>
+            <StatCard value="10,000+" label="หุ้นที่ติดตาม" color="#00d4ff" />
+            <StatCard value="5 ปัจจัย" label="วิเคราะห์ต่อวัน" color="#00e676" />
+            <StatCard value="SET + US" label="ตลาดหุ้นที่รองรับ" color="#ffd740" />
+            <StatCard value="ฟรี" label="เริ่มต้นใช้งาน" color="#e040fb" />
+          </div>
+        </div>
+      </section>
+
+      {/* ── FEATURES ────────────────────────────────────────────────── */}
+      <section id="features" className="lp-section">
+        <div className="lp-container">
+          <div className="lp-fade" style={{ textAlign: "center", marginBottom: 56 }}>
+            <div style={{ fontSize: 13, color: "#00d4ff", fontWeight: 700, letterSpacing: 2, marginBottom: 12 }}>
+              FEATURES
+            </div>
+            <h2 style={{ fontSize: 36, fontWeight: 800, margin: 0, letterSpacing: -.5 }}>
+              ทุกเครื่องมือที่นักลงทุนต้องการ
+            </h2>
+            <p style={{ fontSize: 16, color: "#6a8099", marginTop: 12 }}>
+              ออกแบบมาสำหรับนักลงทุนรายย่อยที่ต้องการข้อมูลระดับ Professional
+            </p>
+          </div>
+
+          <div className="lp-grid-4 lp-fade lp-fade-delay-1" style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(3, 1fr)",
+            gap: 20,
+          }}>
+            <FeatureCard
+              icon="📡"
+              title="สัญญาณซื้อขาย AI"
+              desc="5-Factor Engine วิเคราะห์ EMA, RSI, MACD, Bollinger Bands, ADX พร้อม Stop Loss อัตโนมัติ"
+            />
+            <FeatureCard
+              icon="🔥"
+              title="Top Opportunities"
+              desc="สแกนหาโอกาสซื้อขายดีที่สุดประจำวัน คัดกรองจากกว่า 10,000 หุ้นทั่วโลก"
+            />
+            <FeatureCard
+              icon="⏪"
+              title="Backtest Engine"
+              desc="ทดสอบกลยุทธ์ย้อนหลังได้ถึง 5 ปี พร้อม Win Rate, Max Drawdown และ Sharpe Ratio"
+            />
+            <FeatureCard
+              icon="📰"
+              title="ข่าว & Sentiment"
+              desc="วิเคราะห์ความรู้สึกตลาดจากข่าวการเงินแบบเรียลไทม์ ทั้งไทยและต่างประเทศ"
+            />
+            <FeatureCard
+              icon="📊"
+              title="Fundamental Data"
+              desc="ข้อมูลพื้นฐานบริษัท P/E, P/BV, ROE, EPS งบการเงิน สำหรับสมาชิก PRO/PREMIUM"
+            />
+            <FeatureCard
+              icon="📅"
+              title="ปฏิทินเศรษฐกิจ"
+              desc="ติดตามเหตุการณ์สำคัญทางเศรษฐกิจทั่วโลก FED, GDP, ดอกเบี้ย ก่อนตลาดขยับ"
+            />
+          </div>
+        </div>
+      </section>
+
+      {/* ── HOW IT WORKS ────────────────────────────────────────────── */}
+      <section style={{ padding: "60px 0", background: "rgba(255,255,255,.015)", borderTop: "1px solid rgba(255,255,255,.05)" }}>
+        <div className="lp-container">
+          <div className="lp-fade" style={{ textAlign: "center", marginBottom: 48 }}>
+            <div style={{ fontSize: 13, color: "#ffd740", fontWeight: 700, letterSpacing: 2, marginBottom: 10 }}>
+              HOW IT WORKS
+            </div>
+            <h2 style={{ fontSize: 32, fontWeight: 800, margin: 0 }}>เริ่มต้น 3 ขั้นตอน</h2>
+          </div>
+          <div className="lp-grid-3" style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 28 }}>
+            {[
+              { num: "01", title: "สมัครฟรี", desc: "Login ด้วย Google Account ไม่ต้องกรอกข้อมูลเพิ่ม พร้อมใช้ทันที", color: "#00d4ff" },
+              { num: "02", title: "เลือกหุ้นที่สนใจ", desc: "เพิ่มหุ้นใน Watchlist หรือใช้ Scanner ค้นหาโอกาสที่เหมาะสม", color: "#00e676" },
+              { num: "03", title: "รับสัญญาณอัตโนมัติ", desc: "ระบบ AI วิเคราะห์และส่งสัญญาณซื้อขายพร้อม Stop Loss ทุกวัน", color: "#ffd740" },
+            ].map((s, i) => (
+              <div key={i} className={`lp-fade lp-fade-delay-${i + 1}`} style={{ textAlign: "center", padding: "8px 16px" }}>
+                <div style={{
+                  fontSize: 42, fontWeight: 900, color: "transparent",
+                  backgroundImage: `linear-gradient(135deg, ${s.color}, transparent)`,
+                  WebkitBackgroundClip: "text", backgroundClip: "text",
+                  marginBottom: 16, lineHeight: 1,
+                }}>
+                  {s.num}
+                </div>
+                <div style={{ fontSize: 18, fontWeight: 700, marginBottom: 10, color: "#e2e8f0" }}>{s.title}</div>
+                <div style={{ fontSize: 14, color: "#6a8099", lineHeight: 1.7 }}>{s.desc}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── NEWS ────────────────────────────────────────────────────── */}
+      <section id="news" className="lp-section">
+        <div className="lp-container">
+          <div className="lp-fade" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 36, flexWrap: "wrap", gap: 12 }}>
+            <div>
+              <div style={{ fontSize: 13, color: "#00d4ff", fontWeight: 700, letterSpacing: 2, marginBottom: 8 }}>
+                MARKET NEWS
+              </div>
+              <h2 style={{ fontSize: 28, fontWeight: 800, margin: 0 }}>ข่าวตลาดล่าสุด</h2>
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, color: "#4a5a70" }}>
+              <span style={{ animation: "blinkDot 2s ease-in-out infinite", color: "#00e676", fontSize: 8 }}>●</span>
+              อัปเดตอัตโนมัติทุก 5 นาที
+            </div>
+          </div>
+
+          {newsLoading ? (
+            <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+              {[1, 2, 3].map(i => (
+                <div key={i} style={{
+                  flex: 1, minWidth: 280, height: 100,
+                  background: "rgba(255,255,255,.03)", borderRadius: 12,
+                  animation: "glowPulse 1.5s ease-in-out infinite",
+                }} />
+              ))}
+            </div>
+          ) : news.length === 0 ? (
+            <div style={{
+              padding: "40px 24px", textAlign: "center",
+              background: "rgba(255,255,255,.02)",
+              border: "1px solid rgba(255,255,255,.06)",
+              borderRadius: 16, color: "#4a5a70", fontSize: 14,
+            }}>
+              📰 ข่าวกำลังโหลด — เปิดใช้งานหลัง Login เพื่อดูข่าวเต็มรูปแบบ
+            </div>
+          ) : (
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))", gap: 14 }}>
+              {news.map((item, i) => (
+                <a
+                  key={item.id ?? i}
+                  href={item.url || "#"}
+                  target={item.url ? "_blank" : undefined}
+                  rel="noopener noreferrer"
+                  className={`news-card lp-fade lp-fade-delay-${Math.min(i + 1, 4)}`}
+                >
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
+                    <span style={{
+                      fontSize: 11, padding: "2px 10px", borderRadius: 4,
+                      background: `${sentimentColor(item.sentiment)}18`,
+                      color: sentimentColor(item.sentiment),
+                      border: `1px solid ${sentimentColor(item.sentiment)}40`,
+                      fontWeight: 700, letterSpacing: .5,
+                    }}>
+                      {sentimentLabel(item.sentiment)}
+                    </span>
+                    <span style={{ fontSize: 11, color: "#4a5a70" }}>
+                      {item.source && <span style={{ marginRight: 6 }}>{item.source}</span>}
+                      {timeAgo(item.published_at)}
+                    </span>
+                  </div>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: "#d0dde8", lineHeight: 1.5, marginBottom: 6 }}>
+                    {item.title}
+                  </div>
+                  {item.summary && (
+                    <div style={{
+                      fontSize: 12, color: "#5a6e80", lineHeight: 1.6,
+                      overflow: "hidden", display: "-webkit-box",
+                      WebkitLineClamp: 2, WebkitBoxOrient: "vertical",
+                    }}>
+                      {item.summary}
+                    </div>
+                  )}
+                  {item.related_symbols && item.related_symbols.length > 0 && (
+                    <div style={{ marginTop: 8, display: "flex", gap: 6, flexWrap: "wrap" }}>
+                      {item.related_symbols.slice(0, 4).map(sym => (
+                        <span key={sym} style={{
+                          fontSize: 10, padding: "1px 7px", borderRadius: 3,
+                          background: "rgba(0,212,255,.08)", color: "#00d4ff",
+                          border: "1px solid rgba(0,212,255,.2)",
+                        }}>
+                          {sym}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </a>
+              ))}
+            </div>
+          )}
+        </div>
+      </section>
+
+      {/* ── PRICING ─────────────────────────────────────────────────── */}
+      <section id="pricing" style={{ padding: "80px 0", background: "rgba(255,255,255,.015)", borderTop: "1px solid rgba(255,255,255,.05)" }}>
+        <div className="lp-container">
+          <div className="lp-fade" style={{ textAlign: "center", marginBottom: 52 }}>
+            <div style={{ fontSize: 13, color: "#e040fb", fontWeight: 700, letterSpacing: 2, marginBottom: 10 }}>
+              PRICING
+            </div>
+            <h2 style={{ fontSize: 36, fontWeight: 800, margin: 0 }}>เลือกแผนที่เหมาะกับคุณ</h2>
+            <p style={{ fontSize: 15, color: "#6a8099", marginTop: 12 }}>
+              ไม่มีค่าธรรมเนียมซ่อนเร้น — อัปเกรดหรือยกเลิกได้ตลอดเวลา
+            </p>
+          </div>
+
+          <div className="lp-fade lp-fade-delay-1 lp-flex-plans" style={{ display: "flex", gap: 20, alignItems: "flex-start" }}>
+            <PlanCard
+              name="FREE"
+              thaiName="ฟรี"
+              price="฿0 / เดือน"
+              color="#7a90a8"
+              btnId="google-btn-free"
+              features={[
+                "Watchlist 3 ตัวหุ้น",
+                "Top Opportunities 20 อันดับ",
+                "Backtest ย้อนหลัง 1 ปี",
+                "สัญญาณซื้อขายพื้นฐาน",
+                "ข่าวตลาด & Sentiment",
+              ]}
+            />
+            <PlanCard
+              name="PRO"
+              thaiName="โปร"
+              price="ติดต่อเรา"
+              color="#00d4ff"
+              btnId="google-btn-pro"
+              highlight
+              features={[
+                "Watchlist 10 ตัวหุ้น",
+                "Top Opportunities 100 อันดับ",
+                "Backtest ย้อนหลัง 3 ปี",
+                "Fundamental Data ครบถ้วน",
+                "ปฏิทินเศรษฐกิจ",
+                "สัญญาณ Advanced ทั้งหมด",
+              ]}
+            />
+            <PlanCard
+              name="PREMIUM"
+              thaiName="พรีเมียม"
+              price="ติดต่อเรา"
+              color="#e040fb"
+              btnId="google-btn-premium"
+              features={[
+                "Watchlist 20 ตัวหุ้น",
+                "Top Opportunities 500 อันดับ",
+                "Backtest ย้อนหลัง 5 ปี",
+                "ทุกฟีเจอร์ไม่จำกัด",
+                "Line / Telegram Alerts",
+                "Priority Support",
+              ]}
+            />
+          </div>
+        </div>
+      </section>
+
+      {/* ── TRUST SECTION ───────────────────────────────────────────── */}
+      <section style={{ padding: "60px 0" }}>
+        <div className="lp-container">
+          <div className="lp-fade" style={{
+            display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
+            gap: 24,
+          }}>
+            {[
+              { icon: "🔒", title: "ข้อมูลปลอดภัย", desc: "Login ผ่าน Google OAuth — ไม่เก็บรหัสผ่าน" },
+              { icon: "📡", title: "ข้อมูลอัปเดตทุกวัน", desc: "ราคาหุ้นและสัญญาณอัปเดตทุกวันทำการ" },
+              { icon: "🏆", title: "เทคโนโลยีล้ำสมัย", desc: "Python + Django + React + AI Engine" },
+              { icon: "🇹🇭", title: "สร้างโดยคนไทย", desc: "ออกแบบเพื่อนักลงทุนไทยโดยเฉพาะ" },
+            ].map((t, i) => (
+              <div key={i} className={`lp-fade-delay-${i + 1}`} style={{ textAlign: "center", padding: "20px 16px" }}>
+                <div style={{ fontSize: 36, marginBottom: 12 }}>{t.icon}</div>
+                <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 6, color: "#e2e8f0" }}>{t.title}</div>
+                <div style={{ fontSize: 13, color: "#5a6e80", lineHeight: 1.6 }}>{t.desc}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── FINAL CTA ───────────────────────────────────────────────── */}
+      <section style={{
+        padding: "80px 24px",
+        background: "linear-gradient(135deg, rgba(0,212,255,.06), rgba(224,64,251,.04))",
+        borderTop: "1px solid rgba(255,255,255,.06)",
+        textAlign: "center",
+      }}>
+        <div className="lp-fade" style={{ maxWidth: 560, margin: "0 auto" }}>
+          <div style={{ fontSize: 48, marginBottom: 16 }}>◈</div>
+          <h2 style={{ fontSize: 32, fontWeight: 800, margin: "0 0 16px" }}>
+            เริ่มต้นวิเคราะห์หุ้นวันนี้
+          </h2>
+          <p style={{ fontSize: 16, color: "#6a8099", marginBottom: 36, lineHeight: 1.7 }}>
+            สมัครฟรี ไม่มีค่าใช้จ่าย — เริ่มใช้งานได้ทันทีด้วย Google Account
+          </p>
+          {!noGoogleId && (
+            <div style={{ display: "flex", justifyContent: "center", marginBottom: 16 }}>
+              <div id="google-btn-cta" />
+            </div>
+          )}
+          <div style={{ fontSize: 12, color: "#3a4a58" }}>
+            radarhoon.com — ระบบวิเคราะห์หุ้น AI-Powered
+          </div>
+        </div>
+      </section>
+
+      {/* ── FOOTER ──────────────────────────────────────────────────── */}
+      <footer style={{
+        borderTop: "1px solid rgba(255,255,255,.05)",
+        padding: "36px 24px 70px",
+        background: "#050a12",
+      }}>
+        <div className="lp-container">
+          <div style={{ display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: 24 }}>
+            <div>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+                <span style={{ fontSize: 22, color: "#00d4ff" }}>◈</span>
+                <span style={{ fontSize: 16, fontWeight: 800 }}>Radar<span style={{ color: "#00d4ff" }}>หุ้น</span></span>
+              </div>
+              <div style={{ fontSize: 13, color: "#3a4a58", maxWidth: 260, lineHeight: 1.7 }}>
+                ระบบวิเคราะห์หุ้น AI-Powered สำหรับนักลงทุนรายย่อยชาวไทย
+              </div>
+              <div style={{ marginTop: 12, fontSize: 12, color: "#2a3a4a" }}>
+                radarhoon.com
+              </div>
+            </div>
+            <div style={{ display: "flex", gap: 48, flexWrap: "wrap" }}>
+              <div>
+                <div style={{ fontSize: 12, fontWeight: 700, color: "#4a5a70", letterSpacing: 1, marginBottom: 12 }}>
+                  ผลิตภัณฑ์
+                </div>
+                {["ฟีเจอร์", "ราคา", "Backtest", "Top Opportunities"].map(l => (
+                  <div key={l} style={{ marginBottom: 8 }}>
+                    <span style={{ fontSize: 13, color: "#3a4a58", cursor: "pointer" }}>{l}</span>
+                  </div>
+                ))}
+              </div>
+              <div>
+                <div style={{ fontSize: 12, fontWeight: 700, color: "#4a5a70", letterSpacing: 1, marginBottom: 12 }}>
+                  ช่วยเหลือ
+                </div>
+                {["คำแนะนำการใช้งาน", "ถาม-ตอบ", "ติดต่อเรา", "Terms of Service"].map(l => (
+                  <div key={l} style={{ marginBottom: 8 }}>
+                    <span style={{ fontSize: 13, color: "#3a4a58", cursor: "pointer" }}>{l}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+          <div style={{
+            marginTop: 36, paddingTop: 20,
+            borderTop: "1px solid rgba(255,255,255,.04)",
+            display: "flex", justifyContent: "space-between",
+            flexWrap: "wrap", gap: 8,
+            fontSize: 12, color: "#2a3a4a",
+          }}>
+            <span>© {new Date().getFullYear()} RadarHoon.com — สงวนลิขสิทธิ์</span>
+            <span>⚠️ ข้อมูลบนเว็บไซต์นี้มีวัตถุประสงค์เพื่อการศึกษาเท่านั้น ไม่ใช่คำแนะนำการลงทุน</span>
+          </div>
+        </div>
+      </footer>
+
+      {/* ── TICKER TAPE (ดัชนีวิ่งด้านล่าง) ────────────────────────── */}
+      <TickerTape />
+
+    </div>
+  )
+}

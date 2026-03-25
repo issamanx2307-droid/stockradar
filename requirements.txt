@@ -17,6 +17,10 @@ psycopg2-binary==2.9.9
 # Cache / Broker
 redis==5.0.1
 
+# Celery (Background Tasks + Scheduler)
+celery==5.3.6
+django-celery-beat==2.6.0
+
 # Data Processing
 pandas>=2.2.0
 numpy>=1.26.0

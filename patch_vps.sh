@@ -33,7 +33,11 @@ deactivate
 systemctl restart stockradar
 echo "✅ Django restarted"
 
-# ── 4. Reload Nginx ───────────────────────────────────────
+# ── 4. Restart Celery ─────────────────────────────────────
+systemctl restart stockradar-celery 2>/dev/null && echo "✅ Celery Worker restarted" || echo "⚠️  Celery Worker ยังไม่ได้ติดตั้ง (รัน setup_services.sh)"
+systemctl restart stockradar-celerybeat 2>/dev/null && echo "✅ Celery Beat restarted" || echo "⚠️  Celery Beat ยังไม่ได้ติดตั้ง"
+
+# ── 5. Reload Nginx ───────────────────────────────────────
 nginx -t && systemctl reload nginx
 echo "✅ Nginx reloaded"
 

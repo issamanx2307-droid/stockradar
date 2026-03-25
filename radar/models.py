@@ -34,6 +34,15 @@ class Profile(models.Model):
     line_notify_token = models.CharField(max_length=100, blank=True, null=True)
     telegram_chat_id  = models.CharField(max_length=50,  blank=True, null=True)
     max_strategies    = models.IntegerField(default=3)
+
+    # ── Google OAuth ──────────────────────────────────────────────────────────
+    google_id        = models.CharField(max_length=128, blank=True, null=True,
+                                        unique=True, verbose_name="Google ID")
+    picture_url      = models.URLField(max_length=512, blank=True, null=True,
+                                       verbose_name="รูปโปรไฟล์ Google")
+    login_via_google = models.BooleanField(default=False, db_index=True,
+                                           verbose_name="สมัครด้วย Google")
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

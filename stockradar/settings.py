@@ -43,6 +43,7 @@ INSTALLED_APPS = [
     "radar",
     "channels",
     "engine_api",
+    "django_celery_beat",
 ]
 
 MIDDLEWARE = [

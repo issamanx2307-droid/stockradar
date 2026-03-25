@@ -3,7 +3,7 @@ import { useRadarWS } from "./hooks/useRadarWS"
 import { WsStatus } from "./components/WsStatus"
 import { ScannerProgress } from "./components/ScannerProgress"
 import { AuthProvider, useAuth } from "./context/AuthContext"
-import LoginPage from "./pages/LoginPage"
+import LandingPage from "./pages/LandingPage"
 import UserBadge from "./components/UserBadge"
 import Dashboard from "./pages/Dashboard"
 import Scanner from "./pages/Scanner"
@@ -82,8 +82,8 @@ function AppInner() {
     )
   }
 
-  // ยังไม่ได้ login → แสดงหน้า Login
-  if (!user) return <LoginPage />
+  // ยังไม่ได้ login → แสดง Landing Page
+  if (!user) return <LandingPage />
 
   return (
     <TermAssistantProvider>

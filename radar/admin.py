@@ -339,22 +339,26 @@ class SubscriptionAdmin(admin.ModelAdmin):
     expire_subscriptions.short_description = "❌ Expire ที่เลือก"
 
 
-# Profile admin อัปเกรด (เพิ่ม inline subscriptions)
+# Profile admin อัปเกรด (เพิ่ม inline subscriptions + Google info)
 admin.site.unregister(Profile)
 
 @admin.register(Profile)
 class ProfileAdmin(admin.ModelAdmin):
-    list_display  = ("user", "tier_badge", "sub_status", "sub_end_date",
+    list_display  = ("user", "tier_badge", "google_badge", "sub_status", "sub_end_date",
                      "max_strategies", "created_at")
-    list_filter   = ("tier", "created_at")
-    search_fields = ("user__username", "user__email")
+    list_filter   = ("tier", "login_via_google", "created_at")
+    search_fields = ("user__username", "user__email", "google_id")
     ordering      = ("-created_at",)
     inlines       = [SubscriptionInline]
-    readonly_fields = ("tier",)  # tier ถูกควบคุมผ่าน Subscription
+    readonly_fields = ("tier", "google_id", "login_via_google", "google_picture_preview")
 
     fieldsets = (
         ("ข้อมูลผู้ใช้", {
             "fields": ("user", "tier", "max_strategies"),
+        }),
+        ("บัญชี Google", {
+            "fields": ("login_via_google", "google_id", "picture_url", "google_picture_preview"),
+            "classes": ("collapse",),
         }),
         ("การแจ้งเตือน", {
             "fields": ("line_notify_token", "telegram_chat_id"),
@@ -370,6 +374,28 @@ class ProfileAdmin(admin.ModelAdmin):
         )
     tier_badge.short_description = "Tier"
 
+    def google_badge(self, obj):
+        if obj.login_via_google:
+            if obj.picture_url:
+                return format_html(
+                    '<span title="{}" style="display:inline-flex;align-items:center;gap:6px;">'
+                    '<img src="{}" width="24" height="24" style="border-radius:50%;vertical-align:middle;"/>'
+                    '<span style="color:#4285F4;font-weight:bold;">● Google</span></span>',
+                    obj.google_id or "", obj.picture_url
+                )
+            return format_html('<span style="color:#4285F4;font-weight:bold;">● Google</span>')
+        return format_html('<span style="color:#9ca3af;">—</span>')
+    google_badge.short_description = "Google"
+
+    def google_picture_preview(self, obj):
+        if obj.picture_url:
+            return format_html(
+                '<img src="{}" width="64" height="64" style="border-radius:50%;border:2px solid #4285F4;" />',
+                obj.picture_url
+            )
+        return "—"
+    google_picture_preview.short_description = "รูปโปรไฟล์"
+
     def sub_status(self, obj):
         sub = obj.active_subscription
         if sub:
@@ -381,3 +407,4 @@ class ProfileAdmin(admin.ModelAdmin):
         sub = obj.active_subscription
         return sub.end_date if sub else "—"
     sub_end_date.short_description = "หมดอายุ"
+
