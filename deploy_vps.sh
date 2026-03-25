@@ -87,7 +87,7 @@ apt install -y nodejs
 cd /opt/stockradar/frontend
 
 cat > .env.production << 'FRONTEOF'
-VITE_API_URL=http://187.127.107.228/api
+VITE_API_URL=https://radarhoon.com/api
 VITE_GOOGLE_CLIENT_ID=604864460946-q4bcklavlc972jsc6ifsj59ll9760usp.apps.googleusercontent.com
 FRONTEOF
 

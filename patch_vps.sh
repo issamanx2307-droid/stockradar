@@ -1,51 +1,48 @@
 #!/bin/bash
 # ============================================================
-# patch_vps.sh — แก้ไข radarhoon.com ให้ทำงานได้
-# รันบน VPS ด้วย: bash /opt/stockradar/patch_vps.sh
+# patch_vps.sh — แก้ปัญหา Mixed Content + CSRF บน VPS
+# รันบน VPS: bash /opt/stockradar/patch_vps.sh
 # ============================================================
 set -e
 
-echo "🔧 Patching StockRadar for radarhoon.com..."
+echo "🔧 เริ่ม patch VPS..."
 
-# ── 1. Generate SECRET_KEY ────────────────────────────────
-NEW_SECRET=$(python3 -c "import secrets; print(secrets.token_urlsafe(50))")
-echo "✅ Generated new SECRET_KEY"
+# ── 1. Pull โค้ดใหม่จาก GitHub ───────────────────────────
+cd /opt/stockradar
+git pull
+echo "✅ git pull สำเร็จ"
 
-# ── 2. แก้ไข .env ─────────────────────────────────────────
-cat > /opt/stockradar/.env << ENVEOF
-DJANGO_SECRET_KEY=${NEW_SECRET}
-DEBUG=False
-ALLOWED_HOSTS=187.127.107.228,srv1522191.hstgr.cloud,radarhoon.com,www.radarhoon.com
-DATABASE_URL=sqlite:////opt/stockradar/db.sqlite3
-REDIS_URL=
-CORS_ORIGINS=https://radarhoon.com,http://www.radarhoon.com,http://187.127.107.228
-GOOGLE_CLIENT_ID=604864460946-q4bcklavlc972jsc6ifsj59ll9760usp.apps.googleusercontent.com
-GOOGLE_CLIENT_SECRET=
-ENVEOF
-echo "✅ .env updated"
+# ── 2. Rebuild frontend ด้วย HTTPS URL ───────────────────
+cd /opt/stockradar/frontend
 
-# ── 3. แก้ไข Nginx server_name ─────────────────────────────
-sed -i 's/server_name 187.127.107.228 srv1522191.hstgr.cloud;/server_name 187.127.107.228 srv1522191.hstgr.cloud radarhoon.com www.radarhoon.com;/' \
-    /etc/nginx/sites-available/stockradar
-echo "✅ Nginx server_name updated"
+cat > .env.production << 'FRONTEOF'
+VITE_API_URL=https://radarhoon.com/api
+VITE_GOOGLE_CLIENT_ID=604864460946-q4bcklavlc972jsc6ifsj59ll9760usp.apps.googleusercontent.com
+FRONTEOF
 
-# ── 4. Test & restart ──────────────────────────────────────
-nginx -t
-systemctl restart nginx
+npm ci && npm run build
+echo "✅ Frontend build สำเร็จ (HTTPS)"
+
+# ── 3. Restart Django ─────────────────────────────────────
+cd /opt/stockradar
+source .venv/bin/activate
+python manage.py migrate --noinput
+python manage.py collectstatic --noinput
+deactivate
+
 systemctl restart stockradar
-echo "✅ Nginx + Stockradar restarted"
+echo "✅ Django restarted"
 
-# ── 5. ตรวจสอบสถานะ ────────────────────────────────────────
+# ── 4. Reload Nginx ───────────────────────────────────────
+nginx -t && systemctl reload nginx
+echo "✅ Nginx reloaded"
+
+# ── 5. ตรวจสอบผล ──────────────────────────────────────────
 echo ""
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo "📋 สถานะ Stockradar service:"
-systemctl status stockradar --no-pager -l | tail -10
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo "📋 สถานะ Nginx:"
-systemctl status nginx --no-pager | tail -5
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo ""
-echo "🌐 ทดสอบ: curl -I http://radarhoon.com"
-curl -sI http://radarhoon.com | head -5 || echo "⚠️  DNS ยังไม่ propagate หรือ domain ยังไม่ชี้มา VPS"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "🧪 ทดสอบ API..."
+curl -sI https://radarhoon.com/api/dashboard/ | head -5
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo ""
 echo "✅ Patch เสร็จสมบูรณ์!"
+echo "🌐 เข้าได้ที่: https://radarhoon.com"
