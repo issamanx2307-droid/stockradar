@@ -30,64 +30,76 @@ def get_yahoo_ticker(symbol: str, exchange: str) -> str:
     return symbol                   # US: AAPL, MSFT ฯลฯ
 
 
+def _make_session():
+    """สร้าง requests.Session พร้อม browser headers เพื่อเลี่ยง Yahoo Finance block"""
+    import requests
+    session = requests.Session()
+    session.headers.update({
+        "User-Agent": (
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) "
+            "Chrome/120.0.0.0 Safari/537.36"
+        ),
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.5",
+        "Accept-Encoding": "gzip, deflate, br",
+        "Connection": "keep-alive",
+    })
+    return session
+
+
 def fetch_prices_batch(tickers: list[str], start: date, end: date) -> dict:
     """
-    ดึงราคาหุ้นหลายตัวพร้อมกันผ่าน yfinance.download
+    ดึงราคาหุ้นทีละตัว ด้วย browser session เพื่อเลี่ยง Yahoo Finance block
     คืนค่า dict {ticker: rows_list}
     """
-    try:
-        import yfinance as yf
-    except ImportError:
-        raise CommandError("ต้องติดตั้ง yfinance ก่อน: pip install yfinance")
+    import yfinance as yf
 
     if not tickers:
         return {}
 
-    # yfinance download — threads=False ป้องกัน rate limit บน VPS
-    import yfinance as yf
-    yf.set_tz_cache_location("/tmp/yfinance_cache")
-    df = yf.download(
-        tickers,
-        start=start.strftime("%Y-%m-%d"),
-        end=end.strftime("%Y-%m-%d"),
-        group_by="ticker",
-        auto_adjust=True,
-        threads=False,   # ปิด multi-threading ป้องกัน block
-        progress=False,
-    )
-
-    if df.empty:
-        return {}
-
+    session = _make_session()
     results = {}
-    
-    # กรณี ticker เดียว df จะไม่มี MultiIndex ระดับบนสุดเป็น ticker
-    if len(tickers) == 1:
-        t = tickers[0]
-        results[t] = _process_df_rows(df)
-        return results
 
     for ticker in tickers:
-        if ticker not in df.columns.levels[0]:
-            continue
-        ticker_df = df[ticker]
-        results[ticker] = _process_df_rows(ticker_df)
-        
+        for attempt in range(3):   # retry 3 ครั้ง
+            try:
+                t = yf.Ticker(ticker, session=session)
+                df = t.history(
+                    start=start.strftime("%Y-%m-%d"),
+                    end=end.strftime("%Y-%m-%d"),
+                    auto_adjust=True,
+                    actions=False,
+                )
+                if df is not None and not df.empty:
+                    results[ticker] = _process_df_rows(df)
+                break   # สำเร็จ ออกจาก retry loop
+            except Exception:
+                if attempt < 2:
+                    time.sleep(2 ** attempt)   # exponential backoff: 1s, 2s
+                continue
+
     return results
 
 def _process_df_rows(df) -> list[dict]:
-    """Helper แปลง DF เป็น list of dict"""
+    """Helper แปลง DF เป็น list of dict (รองรับทั้ง download และ history)"""
+    # normalize column names (ticker.history คืน 'Close', download คืน ('Close','AAPL'))
+    if hasattr(df.columns, "levels"):
+        df = df.droplevel(1, axis=1) if df.columns.nlevels > 1 else df
+    df.columns = [str(c).split(",")[0].strip().title() for c in df.columns]
+
     rows = []
     for idx, row in df.iterrows():
-        if pd.isna(row["Close"]) or row["Close"] == 0:
+        close = row.get("Close")
+        if close is None or pd.isna(close) or float(close) == 0:
             continue
         rows.append({
-            "date": idx.date() if hasattr(idx, "date") else idx,
-            "open": Decimal(str(round(float(row["Open"]), 4))),
-            "high": Decimal(str(round(float(row["High"]), 4))),
-            "low": Decimal(str(round(float(row["Low"]), 4))),
-            "close": Decimal(str(round(float(row["Close"]), 4))),
-            "volume": int(row["Volume"]) if not pd.isna(row["Volume"]) else 0,
+            "date":   idx.date() if hasattr(idx, "date") else idx,
+            "open":   Decimal(str(round(float(row.get("Open",  close)), 4))),
+            "high":   Decimal(str(round(float(row.get("High",  close)), 4))),
+            "low":    Decimal(str(round(float(row.get("Low",   close)), 4))),
+            "close":  Decimal(str(round(float(close), 4))),
+            "volume": int(row["Volume"]) if "Volume" in row and not pd.isna(row["Volume"]) else 0,
         })
     return rows
 
