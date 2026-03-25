@@ -193,18 +193,31 @@ AUTHENTICATION_BACKENDS = [
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:5173",
     "http://127.0.0.1:5173",
+    # production HTTPS defaults (overridden by CORS_ORIGINS env var)
+    "https://radarhoon.com",
+    "https://www.radarhoon.com",
 ] + [
     o.strip() for o in os.environ.get("CORS_ORIGINS", "").split(",") if o.strip()
 ]
 CORS_ALLOW_ALL_ORIGINS = DEBUG
 
+# CSRF Trusted Origins — ต้องมีเมื่อใช้ HTTPS หรืออยู่หลัง reverse proxy
+CSRF_TRUSTED_ORIGINS = [
+    o.strip() for o in os.environ.get(
+        "CSRF_TRUSTED_ORIGINS",
+        "https://radarhoon.com,https://www.radarhoon.com"
+    ).split(",") if o.strip()
+]
+
 # Security headers (production)
 if not DEBUG:
-    SECURE_BROWSER_XSS_FILTER   = True
-    SECURE_CONTENT_TYPE_NOSNIFF = True
-    X_FRAME_OPTIONS             = "DENY"
-    SESSION_COOKIE_SECURE       = True
-    CSRF_COOKIE_SECURE          = True
+    SECURE_BROWSER_XSS_FILTER      = True
+    SECURE_CONTENT_TYPE_NOSNIFF    = True
+    X_FRAME_OPTIONS                = "DENY"
+    SESSION_COOKIE_SECURE          = True
+    CSRF_COOKIE_SECURE             = True
+    # บอก Django ว่าอยู่หลัง Nginx proxy — ใช้ X-Forwarded-Proto header
+    SECURE_PROXY_SSL_HEADER        = ("HTTP_X_FORWARDED_PROTO", "https")
 
 # ---------------------------------------------------------------------------
 # ภาษาและเวลา
