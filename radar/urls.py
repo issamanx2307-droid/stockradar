@@ -43,4 +43,7 @@ urlpatterns = [
     path("calendar/",                  views.economic_calendar_api, name="calendar"),
     path("subscription/",              views.subscription_status,   name="subscription"),
     path("subscription/plans/",        views.subscription_plans,    name="subscription-plans"),
+    # ── GitHub Actions Data Import ──
+    path("symbols-export/",            views.symbols_export,        name="symbols-export"),
+    path("import-prices/",             views.import_prices,         name="import-prices"),
 ]

@@ -248,6 +248,10 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 # ---------------------------------------------------------------------------
 
 PRICE_HISTORY_DAYS = int(os.environ.get("PRICE_HISTORY_DAYS", 365))
+
+# Token สำหรับ GitHub Actions ส่งข้อมูลราคาเข้า VPS
+# ตั้งค่าใน .env: IMPORT_API_TOKEN=<random_secret>
+IMPORT_API_TOKEN = os.environ.get("IMPORT_API_TOKEN", "")
 SUPPORTED_EXCHANGES = ["SET", "NASDAQ", "NYSE"]
 PRICE_LOAD_BATCH_SIZE = int(os.environ.get("PRICE_LOAD_BATCH_SIZE", 50))
 

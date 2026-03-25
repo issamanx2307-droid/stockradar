@@ -1434,3 +1434,80 @@ def subscription_status(request):
         "plan":      plan,
         "expires_at": expires_at,
     })
+
+
+# ─── GitHub Actions Import ────────────────────────────────────────────────────
+
+@api_view(["GET"])
+def symbols_export(request):
+    """
+    คืนรายชื่อหุ้นทั้งหมดพร้อม yahoo ticker format
+    ใช้โดย GitHub Actions fetch_prices.py
+    Public endpoint (ไม่ต้อง login)
+    """
+    from django.conf import settings as dj_settings
+    symbols = Symbol.objects.values("symbol", "exchange", "name")
+    result = []
+    for s in symbols:
+        if s["exchange"] == "SET":
+            yahoo = f"{s['symbol']}.BK"
+        else:
+            yahoo = s["symbol"]
+        result.append({
+            "symbol":   s["symbol"],
+            "exchange": s["exchange"],
+            "yahoo":    yahoo,
+        })
+    return Response(result)
+
+
+@api_view(["POST"])
+def import_prices(request):
+    """
+    รับข้อมูลราคาหุ้นจาก GitHub Actions แล้ว upsert ลง DB
+    Header: X-Import-Token: <IMPORT_API_TOKEN>
+    Body: [{"symbol":"PTT","date":"2025-03-26","open":...,
+            "high":...,"low":...,"close":...,"volume":...}, ...]
+    """
+    from django.conf import settings as dj_settings
+    from django.db import transaction
+
+    # ── ตรวจสอบ token ──
+    token = request.headers.get("X-Import-Token", "")
+    expected = getattr(dj_settings, "IMPORT_API_TOKEN", "")
+    if not expected or token != expected:
+        return Response({"error": "unauthorized"}, status=401)
+
+    records = request.data
+    if not isinstance(records, list):
+        return Response({"error": "expected JSON array"}, status=400)
+
+    # ── โหลด symbols map ──
+    sym_map = {s.symbol: s for s in Symbol.objects.all()}
+
+    imported = skipped = 0
+
+    with transaction.atomic():
+        for rec in records:
+            sym_obj = sym_map.get(rec.get("symbol"))
+            if not sym_obj:
+                skipped += 1
+                continue
+            try:
+                from decimal import Decimal
+                PriceDaily.objects.update_or_create(
+                    symbol=sym_obj,
+                    date=rec["date"],
+                    defaults={
+                        "open":   Decimal(str(rec["open"])),
+                        "high":   Decimal(str(rec["high"])),
+                        "low":    Decimal(str(rec["low"])),
+                        "close":  Decimal(str(rec["close"])),
+                        "volume": int(rec.get("volume", 0)),
+                    },
+                )
+                imported += 1
+            except Exception:
+                skipped += 1
+
+    return Response({"imported": imported, "skipped": skipped})
