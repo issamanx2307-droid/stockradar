@@ -135,6 +135,27 @@ function PlanCard({
   )
 }
 
+// ── Signal types ──────────────────────────────────────────────────────────────
+interface TopSignal {
+  id: number
+  symbol: string
+  exchange?: string
+  score: number
+  signal_type: string
+  direction: string
+  entry_price?: number
+  stop_loss?: number
+}
+
+function sigLabel(t: string) {
+  const map: Record<string, string> = {
+    BUY: "BUY", STRONG_BUY: "STRONG", GOLDEN_CROSS: "CROSS",
+    EMA_ALIGNMENT: "ALIGN", BREAKOUT: "BREAK", OVERSOLD: "OVS",
+  }
+  return map[t] ?? t.slice(0, 5)
+}
+function sigColor(d: string) { return d === "LONG" ? "#00e676" : "#ff5252" }
+
 // ── Main Component ─────────────────────────────────────────────────────────────
 export default function LandingPage() {
   const { loginWithGoogle } = useAuth()
@@ -142,7 +163,9 @@ export default function LandingPage() {
   const [loginLoading, setLoginLoading] = useState(false)
   const [news, setNews] = useState<NewsItem[]>([])
   const [newsLoading, setNewsLoading] = useState(true)
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const [topSignals, setTopSignals] = useState<TopSignal[]>([])
+  const [lastUpdate, setLastUpdate] = useState("")
+  const [blinkIdx, setBlinkIdx] = useState(0)
   const heroRef = useRef<HTMLDivElement>(null)
 
   // ── Google login init ───────────────────────────────────────────────────────
@@ -179,6 +202,30 @@ export default function LandingPage() {
       }
     })
   }
+
+  // ── Top Signals fetch (auto-update ทุก 5 นาที) ───────────────────────────────
+  useEffect(() => {
+    let cancelled = false
+    async function loadTop() {
+      try {
+        const res = await fetch(`${API_BASE}/dashboard/`)
+        const d = await res.json()
+        if (!cancelled && d.top_bullish?.length) {
+          setTopSignals(d.top_bullish.slice(0, 7))
+          setLastUpdate(new Date().toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" }))
+        }
+      } catch { /* silent */ }
+    }
+    loadTop()
+    const iv = setInterval(loadTop, 5 * 60 * 1000)
+    return () => { cancelled = true; clearInterval(iv) }
+  }, [])
+
+  // ── Blink row highlight ────────────────────────────────────────────────────
+  useEffect(() => {
+    const iv = setInterval(() => setBlinkIdx(i => (i + 1) % 7), 2000)
+    return () => clearInterval(iv)
+  }, [])
 
   // ── News fetch (auto-update ทุก 5 นาที) ─────────────────────────────────────
   useEffect(() => {
@@ -279,8 +326,15 @@ export default function LandingPage() {
           border-color: rgba(0,212,255,.3);
           background: rgba(0,212,255,.04);
         }
-        @media (max-width: 768px) {
-          .lp-hero-title { font-size: 36px !important; }
+        @keyframes rowBlink {
+          0%,100% { background: transparent; }
+          50%      { background: rgba(0,212,255,.06); }
+        }
+        .signal-row-blink { animation: rowBlink 1s ease-in-out; }
+        @media (max-width: 900px) {
+          .lp-hero-title { font-size: 32px !important; }
+          .lp-hero-layout { flex-direction: column !important; }
+          .lp-hero-card { width: 100% !important; max-width: 100% !important; position: static !important; }
           .lp-grid-4 { grid-template-columns: repeat(2, 1fr) !important; }
           .lp-grid-3 { grid-template-columns: 1fr !important; }
           .lp-flex-plans { flex-direction: column !important; }
@@ -362,11 +416,158 @@ export default function LandingPage() {
           pointerEvents: "none",
         }} />
 
-        <div className="lp-container" style={{ position: "relative", zIndex: 1, padding: "80px 24px" }}>
-          <div style={{ maxWidth: 700 }}>
+        <div className="lp-container lp-hero-layout" style={{
+          position: "relative", zIndex: 1,
+          padding: "80px 24px",
+          display: "flex", alignItems: "center", gap: 48,
+        }}>
 
+          {/* ── LEFT: TOP OPPORTUNITIES CARD ── */}
+          <div className="lp-hero-card lp-fade" style={{
+            flexShrink: 0, width: 400,
+            animation: "heroFloat 5s ease-in-out infinite",
+          }}>
+            <div style={{
+              background: "rgba(10,18,35,.95)", backdropFilter: "blur(16px)",
+              border: "1px solid rgba(0,212,255,.25)",
+              borderRadius: 20,
+              boxShadow: "0 24px 80px rgba(0,0,0,.6), 0 0 60px rgba(0,212,255,.1)",
+              overflow: "hidden",
+            }}>
+              {/* Card header */}
+              <div style={{
+                padding: "16px 22px",
+                borderBottom: "1px solid rgba(0,212,255,.12)",
+                background: "rgba(0,212,255,.04)",
+                display: "flex", alignItems: "center", justifyContent: "space-between",
+              }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <div style={{
+                    width: 8, height: 8, borderRadius: "50%", background: "#00e676",
+                    boxShadow: "0 0 8px #00e676",
+                    animation: "blinkDot 1.2s ease-in-out infinite",
+                  }} />
+                  <span style={{ fontSize: 12, fontWeight: 800, color: "#e2e8f0", letterSpacing: 1 }}>
+                    TOP OPPORTUNITIES
+                  </span>
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                  {lastUpdate && (
+                    <span style={{ fontSize: 10, color: "#4a5a70" }}>อัปเดต {lastUpdate}</span>
+                  )}
+                  <span style={{
+                    fontSize: 10, fontWeight: 700, color: "#00e676",
+                    background: "rgba(0,230,118,.1)", border: "1px solid rgba(0,230,118,.25)",
+                    borderRadius: 4, padding: "2px 7px",
+                  }}>LIVE</span>
+                </div>
+              </div>
+
+              {/* Column headers */}
+              <div style={{
+                display: "grid", gridTemplateColumns: "32px 1fr 60px 56px",
+                padding: "8px 22px", gap: 8,
+                fontSize: 10, fontWeight: 700, color: "#3a5a70", letterSpacing: 1,
+                borderBottom: "1px solid rgba(255,255,255,.04)",
+              }}>
+                <span>#</span><span>หุ้น</span><span style={{ textAlign: "center" }}>SIGNAL</span><span style={{ textAlign: "right" }}>SCORE</span>
+              </div>
+
+              {/* Signal rows */}
+              <div style={{ padding: "4px 0" }}>
+                {(topSignals.length > 0 ? topSignals : Array(7).fill(null)).map((s, i) => {
+                  const isLoading = !s
+                  const isBlink = !isLoading && i === blinkIdx % topSignals.length
+                  return (
+                    <div key={i} className={isBlink ? "signal-row-blink" : ""} style={{
+                      display: "grid", gridTemplateColumns: "32px 1fr 60px 56px",
+                      alignItems: "center", gap: 8,
+                      padding: "10px 22px",
+                      borderBottom: "1px solid rgba(255,255,255,.03)",
+                      fontSize: 13,
+                      transition: "background .3s",
+                    }}>
+                      {/* Rank */}
+                      <span style={{
+                        fontSize: 11, fontWeight: 700,
+                        color: i === 0 ? "#ffd740" : i === 1 ? "#a0a0a0" : i === 2 ? "#cd7f32" : "#2a3a50",
+                      }}>
+                        {isLoading ? "—" : `${i + 1}`}
+                      </span>
+
+                      {/* Symbol + exchange */}
+                      <div>
+                        {isLoading ? (
+                          <div style={{ width: 60, height: 12, background: "rgba(255,255,255,.05)", borderRadius: 4 }} />
+                        ) : (
+                          <>
+                            <div style={{ fontWeight: 700, color: "#d8e8f0", fontSize: 14 }}>{s.symbol}</div>
+                            <div style={{ fontSize: 10, color: "#3a5a70", marginTop: 1 }}>{s.exchange ?? ""}</div>
+                          </>
+                        )}
+                      </div>
+
+                      {/* Signal badge */}
+                      <div style={{ textAlign: "center" }}>
+                        {!isLoading && (
+                          <span style={{
+                            fontSize: 10, fontWeight: 700, padding: "3px 7px", borderRadius: 5,
+                            background: `${sigColor(s.direction)}15`,
+                            color: sigColor(s.direction),
+                            border: `1px solid ${sigColor(s.direction)}35`,
+                            letterSpacing: .3,
+                          }}>
+                            {sigLabel(s.signal_type)}
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Score bar */}
+                      <div style={{ textAlign: "right" }}>
+                        {isLoading ? (
+                          <div style={{ width: 36, height: 12, background: "rgba(255,255,255,.05)", borderRadius: 4, marginLeft: "auto" }} />
+                        ) : (
+                          <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 3 }}>
+                            <span style={{
+                              fontFamily: "monospace", fontWeight: 800, fontSize: 14,
+                              color: s.score >= 85 ? "#00e676" : s.score >= 70 ? "#ffd740" : "#7a90a8",
+                            }}>
+                              {s.score}
+                            </span>
+                            <div style={{ width: 40, height: 3, background: "rgba(255,255,255,.08)", borderRadius: 2 }}>
+                              <div style={{
+                                width: `${s.score}%`, height: "100%", borderRadius: 2,
+                                background: s.score >= 85 ? "#00e676" : s.score >= 70 ? "#ffd740" : "#448aff",
+                              }} />
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+
+              {/* Card footer */}
+              <div style={{
+                padding: "12px 22px",
+                borderTop: "1px solid rgba(255,255,255,.04)",
+                display: "flex", justifyContent: "space-between", alignItems: "center",
+              }}>
+                <span style={{ fontSize: 11, color: "#2a3a50" }}>
+                  {topSignals.length > 0 ? "ข้อมูลจริงจากระบบ" : "กำลังโหลด..."}
+                </span>
+                <span style={{ fontSize: 11, color: "#00d4ff", cursor: "pointer" }}>
+                  ดูทั้งหมด →
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* ── RIGHT: HEADLINE + CTA ── */}
+          <div style={{ flex: 1, minWidth: 0 }}>
             {/* Badge */}
-            <div className="lp-fade" style={{
+            <div className="lp-fade lp-fade-delay-1" style={{
               display: "inline-flex", alignItems: "center", gap: 8,
               background: "rgba(0,212,255,.08)", border: "1px solid rgba(0,212,255,.25)",
               borderRadius: 50, padding: "6px 16px", marginBottom: 28,
@@ -385,8 +586,7 @@ export default function LandingPage() {
               <span style={{
                 color: "transparent",
                 backgroundImage: "linear-gradient(135deg, #00d4ff, #00e676)",
-                WebkitBackgroundClip: "text",
-                backgroundClip: "text",
+                WebkitBackgroundClip: "text", backgroundClip: "text",
               }}>
                 มืออาชีพ
               </span>
@@ -395,8 +595,8 @@ export default function LandingPage() {
 
             {/* Subheadline */}
             <p className="lp-fade lp-fade-delay-2" style={{
-              fontSize: 18, color: "#7a90a8", lineHeight: 1.8,
-              margin: "0 0 36px", maxWidth: 560,
+              fontSize: 17, color: "#7a90a8", lineHeight: 1.8,
+              margin: "0 0 32px",
             }}>
               สแกนกว่า <strong style={{ color: "#e2e8f0" }}>10,000+ หุ้น</strong> ทั่วโลก — ตลาดหุ้นไทย (SET) และ US Market
               พร้อมสัญญาณซื้อขายจาก <strong style={{ color: "#e2e8f0" }}>5-Factor Engine</strong> และข้อมูล Fundamental แบบเรียลไทม์
@@ -404,14 +604,11 @@ export default function LandingPage() {
 
             {/* Feature pills */}
             <div className="lp-fade lp-fade-delay-2" style={{
-              display: "flex", flexWrap: "wrap", gap: 10, marginBottom: 44,
+              display: "flex", flexWrap: "wrap", gap: 10, marginBottom: 40,
             }}>
-              {[
-                "📡 สัญญาณซื้อขาย", "🔥 Top Opportunities", "📊 Backtest",
-                "💼 Portfolio Tracker", "📰 ข่าว & Sentiment",
-              ].map(f => (
+              {["📡 สัญญาณซื้อขาย", "🔥 Top Opportunities", "📊 Backtest", "💼 Portfolio", "📰 ข่าว & Sentiment"].map(f => (
                 <span key={f} style={{
-                  padding: "6px 14px", borderRadius: 20,
+                  padding: "7px 16px", borderRadius: 20,
                   background: "rgba(255,255,255,.05)",
                   border: "1px solid rgba(255,255,255,.1)",
                   fontSize: 13, color: "#a0b4c8",
@@ -439,66 +636,11 @@ export default function LandingPage() {
                 </div>
               )}
               <div style={{ fontSize: 12, color: "#4a5a70" }}>
-                ✓ สมัครฟรี  ✓ ไม่ต้องใส่บัตรเครดิต  ✓ เริ่มใช้งานทันที
+                ✓ สมัครฟรี &nbsp; ✓ ไม่ต้องใส่บัตรเครดิต &nbsp; ✓ เริ่มใช้งานทันที
               </div>
             </div>
           </div>
 
-          {/* Floating card (desktop) */}
-          <div className="lp-hide-mobile" style={{
-            position: "absolute", right: 24, top: "50%", transform: "translateY(-50%)",
-            width: 300,
-          }}>
-            <div style={{
-              background: "rgba(17,24,39,.9)", backdropFilter: "blur(12px)",
-              border: "1px solid rgba(0,212,255,.2)",
-              borderRadius: 20, padding: 24,
-              animation: "heroFloat 5s ease-in-out infinite",
-              boxShadow: "0 20px 60px rgba(0,0,0,.5), 0 0 40px rgba(0,212,255,.08)",
-            }}>
-              <div style={{ fontSize: 12, color: "#6a8099", marginBottom: 16, letterSpacing: 1 }}>
-                TOP OPPORTUNITIES — วันนี้
-              </div>
-              {[
-                { sym: "PTT", score: 92, dir: "BUY", chg: "+2.4%" },
-                { sym: "ADVANC", score: 87, dir: "BUY", chg: "+1.8%" },
-                { sym: "CPALL", score: 81, dir: "WATCH", chg: "+0.9%" },
-                { sym: "AAPL", score: 95, dir: "BUY", chg: "+3.1%" },
-                { sym: "NVDA", score: 91, dir: "BUY", chg: "+4.5%" },
-              ].map((s, i) => (
-                <div key={i} style={{
-                  display: "flex", alignItems: "center", justifyContent: "space-between",
-                  padding: "8px 0", borderBottom: "1px solid rgba(255,255,255,.05)",
-                  fontSize: 13,
-                }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    <span style={{
-                      width: 22, height: 22, borderRadius: 6,
-                      background: i < 2 ? "rgba(0,230,118,.12)" : "rgba(255,215,64,.1)",
-                      border: `1px solid ${i < 2 ? "rgba(0,230,118,.3)" : "rgba(255,215,64,.3)"}`,
-                      display: "flex", alignItems: "center", justifyContent: "center",
-                      fontSize: 9, color: i < 2 ? "#00e676" : "#ffd740", fontWeight: 700,
-                    }}>
-                      {s.score}
-                    </span>
-                    <span style={{ fontWeight: 600 }}>{s.sym}</span>
-                  </div>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    <span style={{
-                      fontSize: 10, padding: "2px 8px", borderRadius: 4,
-                      background: s.dir === "BUY" ? "rgba(0,230,118,.12)" : "rgba(255,215,64,.1)",
-                      color: s.dir === "BUY" ? "#00e676" : "#ffd740",
-                      fontWeight: 700, letterSpacing: .5,
-                    }}>{s.dir}</span>
-                    <span style={{ color: "#00e676", fontFamily: "monospace", fontSize: 12 }}>{s.chg}</span>
-                  </div>
-                </div>
-              ))}
-              <div style={{ marginTop: 14, fontSize: 11, color: "#4a5a70", textAlign: "center" }}>
-                * ข้อมูลจำลองสำหรับแสดงตัวอย่าง
-              </div>
-            </div>
-          </div>
         </div>
       </section>
 
