@@ -22,9 +22,25 @@ function fmtPrice(price: number, type: string): string {
   return price.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 
+// Fallback แสดงเสมอเมื่อ API ยังไม่มีข้อมูล
+const FALLBACK_ITEMS: TickerItem[] = [
+  { symbol:"^GSPC",    label:"S&P 500",   type:"index",     price:5300,   change:12,    change_pct:0.23,  up:true  },
+  { symbol:"^DJI",     label:"Dow Jones", type:"index",     price:39500,  change:-45,   change_pct:-0.11, up:false },
+  { symbol:"^IXIC",    label:"NASDAQ",    type:"index",     price:16800,  change:55,    change_pct:0.33,  up:true  },
+  { symbol:"^SET.BK",  label:"SET",       type:"index",     price:1380,   change:-3,    change_pct:-0.22, up:false },
+  { symbol:"^N225",    label:"Nikkei",    type:"index",     price:38200,  change:180,   change_pct:0.47,  up:true  },
+  { symbol:"^HSI",     label:"Hang Seng", type:"index",     price:17100,  change:-90,   change_pct:-0.52, up:false },
+  { symbol:"GC=F",     label:"Gold",      type:"commodity", price:2320,   change:8.5,   change_pct:0.37,  up:true  },
+  { symbol:"CL=F",     label:"Oil (WTI)", type:"commodity", price:78.5,   change:-0.4,  change_pct:-0.51, up:false },
+  { symbol:"THBUSD=X", label:"USD/THB",   type:"fx",        price:34.82,  change:0.05,  change_pct:0.14,  up:true  },
+  { symbol:"EURUSD=X", label:"EUR/USD",   type:"fx",        price:1.0865, change:-0.002,change_pct:-0.18, up:false },
+  { symbol:"BTC-USD",  label:"Bitcoin",   type:"crypto",    price:67200,  change:850,   change_pct:1.28,  up:true  },
+  { symbol:"ETH-USD",  label:"Ethereum",  type:"crypto",    price:3520,   change:-25,   change_pct:-0.71, up:false },
+]
+
 export default function TickerTape() {
-  const [items, setItems]     = useState<TickerItem[]>([])
-  const [loading, setLoading] = useState(true)
+  const [items, setItems]       = useState<TickerItem[]>(FALLBACK_ITEMS)
+  const [isLive, setIsLive]     = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -35,17 +51,17 @@ export default function TickerTape() {
         const d   = await res.json()
         if (!cancelled && d.items?.length) {
           setItems(d.items)
+          setIsLive(true)
         }
       } catch (e) { console.warn("Ticker fetch error:", e) }
-      if (!cancelled) setLoading(false)
     }
 
     load()
-    const interval = setInterval(load, 5 * 60 * 1000) // 5 นาที
+    const interval = setInterval(load, 5 * 60 * 1000)
     return () => { cancelled = true; clearInterval(interval) }
   }, [])
 
-  if (loading || items.length === 0) return null
+  if (items.length === 0) return null
 
   // ทำซ้ำ items 3 รอบ — animation เลื่อน 1/3 แรกแล้ว reset
   const display = [...items, ...items, ...items]
@@ -67,10 +83,12 @@ export default function TickerTape() {
         flexShrink: 0, padding: "0 10px",
         background: "#0a1929", borderRight: "1px solid #0d2137",
         height: "100%", display: "flex", alignItems: "center", gap: 5,
-        fontSize: 10, fontWeight: 700, color: "#00d4ff", letterSpacing: 1,
+        fontSize: 10, fontWeight: 700, letterSpacing: 1,
+        color: isLive ? "#00d4ff" : "#ffd740",
         zIndex: 1,
       }}>
-        <span style={{ animation: "pulse 1.5s ease-in-out infinite", fontSize: 7 }}>●</span> LIVE
+        <span style={{ animation: "pulse 1.5s ease-in-out infinite", fontSize: 7 }}>●</span>
+        {isLive ? "LIVE" : "MARKET"}
       </div>
 
       {/* Scroll track — กว้างเท่า 3 รอบ เลื่อน 1 รอบแล้ว reset */}

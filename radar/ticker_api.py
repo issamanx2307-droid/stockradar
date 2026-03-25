@@ -34,6 +34,36 @@ TICKER_SYMBOLS = [
 ]
 
 
+def _fetch_single(sym: str, meta: dict) -> dict | None:
+    """ดึงข้อมูลหุ้นเดี่ยว ด้วย download (เร็วกว่า fast_info บน VPS)"""
+    import yfinance as yf
+    try:
+        df = yf.download(sym, period="2d", interval="1d",
+                         progress=False, auto_adjust=True)
+        if df is None or len(df) < 2:
+            return None
+        closes = df["Close"].dropna()
+        if len(closes) < 2:
+            return None
+        price = float(closes.iloc[-1])
+        prev  = float(closes.iloc[-2])
+        if prev == 0:
+            return None
+        change     = price - prev
+        change_pct = (change / prev) * 100
+        return {
+            "symbol":     sym,
+            "label":      meta["label"],
+            "type":       meta["type"],
+            "price":      round(price, 4),
+            "change":     round(change, 4),
+            "change_pct": round(change_pct, 2),
+            "up":         change >= 0,
+        }
+    except Exception:
+        return None
+
+
 def fetch_ticker_data() -> list[dict]:
     """ดึงราคาดัชนีทั้งหมด คืน list พร้อมแสดงผล"""
     cache_key = "ticker_tape_data"
@@ -41,40 +71,26 @@ def fetch_ticker_data() -> list[dict]:
     if cached:
         return cached
 
-    import yfinance as yf
+    from concurrent.futures import ThreadPoolExecutor, as_completed
 
-    symbols = [t["symbol"] for t in TICKER_SYMBOLS]
     label_map = {t["symbol"]: t for t in TICKER_SYMBOLS}
-
     results = []
-    try:
-        tickers = yf.Tickers(" ".join(symbols))
-        for sym in symbols:
-            try:
-                info = tickers.tickers[sym].fast_info
-                price     = getattr(info, "last_price", None)
-                prev      = getattr(info, "previous_close", None)
-                if price is None or prev is None or prev == 0:
-                    continue
 
-                change     = price - prev
-                change_pct = (change / prev) * 100
-                meta       = label_map[sym]
+    with ThreadPoolExecutor(max_workers=6) as ex:
+        futs = {ex.submit(_fetch_single, t["symbol"], t): t["symbol"]
+                for t in TICKER_SYMBOLS}
+        for fut in as_completed(futs, timeout=25):
+            item = fut.result()
+            if item:
+                results.append(item)
 
-                results.append({
-                    "symbol":     sym,
-                    "label":      meta["label"],
-                    "type":       meta["type"],
-                    "price":      round(price, 4),
-                    "change":     round(change, 4),
-                    "change_pct": round(change_pct, 2),
-                    "up":         change >= 0,
-                })
-            except Exception:
-                continue
-    except Exception as e:
-        logger.error("ticker fetch error: %s", e)
+    # เรียงตามลำดับเดิม
+    order = {t["symbol"]: i for i, t in enumerate(TICKER_SYMBOLS)}
+    results.sort(key=lambda x: order.get(x["symbol"], 99))
 
     if results:
-        cache.set(cache_key, results, timeout=300)  # 5 นาที
+        cache.set(cache_key, results, timeout=300)
+    else:
+        logger.warning("ticker_tape: ไม่ได้ข้อมูลเลย — คืน fallback")
+
     return results
