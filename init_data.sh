@@ -68,12 +68,15 @@ ok "โหลดหุ้นเสร็จ — $SYMBOL_COUNT ตัว"
 # ═══════════════════════════════════════════════════════════
 # 5. โหลดราคาหุ้น (90 วันล่าสุด)
 # ═══════════════════════════════════════════════════════════
-step "[5/7] โหลดราคาหุ้น 90 วันล่าสุด (ใช้เวลา 15-30 นาที)"
-echo "  โหลดหุ้นไทย (SET) ก่อน..." | tee -a "$LOG"
-$MANAGE load_prices --exchange SET --days 90 2>&1 | tee -a "$LOG" || warn "SET โหลดบางส่วนล้มเหลว"
+step "[5/7] โหลดราคาหุ้น 90 วันล่าสุด (ใช้เวลา 20-40 นาที)"
+echo "  โหลดหุ้นไทย (SET) batch=5 delay=3s..." | tee -a "$LOG"
+$MANAGE load_prices --exchange SET --days 90 --batch 5 --delay 3 2>&1 | tee -a "$LOG" || warn "SET โหลดบางส่วนล้มเหลว"
 
-echo "  โหลดหุ้น US ต่อ..." | tee -a "$LOG"
-$MANAGE load_prices --exchange US --days 90 2>&1 | tee -a "$LOG" || warn "US โหลดบางส่วนล้มเหลว"
+echo "  พัก 10 วินาทีก่อนโหลด US..." | tee -a "$LOG"
+sleep 10
+
+echo "  โหลดหุ้น US batch=5 delay=3s..." | tee -a "$LOG"
+$MANAGE load_prices --exchange US --days 90 --batch 5 --delay 3 2>&1 | tee -a "$LOG" || warn "US โหลดบางส่วนล้มเหลว"
 
 PRICE_COUNT=$($MANAGE shell -c "from radar.models import PriceDaily; print(PriceDaily.objects.count())" 2>/dev/null || echo "?")
 ok "โหลดราคาเสร็จ — $PRICE_COUNT แถว"
@@ -91,9 +94,14 @@ ok "สร้าง Signal เสร็จ — $SIG_COUNT สัญญาณ"
 # 7. โหลดข่าว (เรียก API ภายใน)
 # ═══════════════════════════════════════════════════════════
 step "[7/7] โหลดข่าวตลาด"
-curl -s -X POST http://127.0.0.1:8000/api/news/fetch/ \
-  -H "Content-Type: application/json" \
-  -d '{}' 2>&1 | tee -a "$LOG" || warn "โหลดข่าวล้มเหลว (ข้ามได้)"
+$MANAGE shell -c "
+try:
+    from radar.news_fetcher import fetch_and_save_news
+    result = fetch_and_save_news(max_per_feed=30)
+    print('ข่าวที่โหลด:', result)
+except Exception as e:
+    print('ข้ามข่าว:', e)
+" 2>&1 | tee -a "$LOG" || warn "โหลดข่าวล้มเหลว (ข้ามได้)"
 ok "โหลดข่าวเสร็จ"
 
 deactivate

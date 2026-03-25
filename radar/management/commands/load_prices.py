@@ -43,14 +43,17 @@ def fetch_prices_batch(tickers: list[str], start: date, end: date) -> dict:
     if not tickers:
         return {}
 
-    # yfinance download คืนค่าเป็น MultiIndex DataFrame ถ้ามีหลาย ticker
+    # yfinance download — threads=False ป้องกัน rate limit บน VPS
+    import yfinance as yf
+    yf.set_tz_cache_location("/tmp/yfinance_cache")
     df = yf.download(
         tickers,
         start=start.strftime("%Y-%m-%d"),
         end=end.strftime("%Y-%m-%d"),
-        group_by='ticker',
+        group_by="ticker",
         auto_adjust=True,
-        threads=True, # ใช้ multi-threading
+        threads=False,   # ปิด multi-threading ป้องกัน block
+        progress=False,
     )
 
     if df.empty:
@@ -122,14 +125,14 @@ class Command(BaseCommand):
         parser.add_argument(
             "--batch",
             type=int,
-            default=getattr(settings, "PRICE_LOAD_BATCH_SIZE", 50),
-            help="จำนวนหุ้นที่โหลดพร้อมกัน (default: 50)",
+            default=getattr(settings, "PRICE_LOAD_BATCH_SIZE", 10),
+            help="จำนวนหุ้นที่โหลดพร้อมกัน (default: 10)",
         )
         parser.add_argument(
             "--delay",
             type=float,
-            default=0.3,
-            help="หน่วงเวลาระหว่างแต่ละหุ้น (วินาที) เพื่อไม่ให้ถูก rate-limit",
+            default=2.0,
+            help="หน่วงเวลาระหว่าง batch (วินาที) เพื่อไม่ให้ถูก rate-limit",
         )
 
     def handle(self, *args, **options):
