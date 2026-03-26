@@ -232,7 +232,7 @@ export default function LandingPage() {
     let cancelled = false
     async function loadNews() {
       try {
-        const res = await fetch(`${API_BASE}/news/?days=1&limit=6`)
+        const res = await fetch(`${API_BASE}/news/?days=7&limit=6`)
         const d = await res.json()
         if (!cancelled) {
           const items: NewsItem[] = d.results ?? d.news ?? d ?? []
