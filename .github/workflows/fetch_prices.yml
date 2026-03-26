@@ -43,3 +43,15 @@ jobs:
           VPS_API_URL:   ${{ secrets.VPS_API_URL }}
           VPS_API_TOKEN: ${{ secrets.VPS_API_TOKEN }}
         run: python scripts/fetch_prices.py --days ${{ github.event.inputs.days }}
+
+      - name: Trigger engine + news on VPS
+        if: success()
+        env:
+          VPS_API_URL:   ${{ secrets.VPS_API_URL }}
+          VPS_API_TOKEN: ${{ secrets.VPS_API_TOKEN }}
+        run: |
+          curl -s -X POST "${VPS_API_URL}/api/trigger-engine/" \
+            -H "X-Import-Token: ${VPS_API_TOKEN}" \
+            -H "Content-Type: application/json" \
+            --max-time 300 \
+            --retry 2 || echo "Engine trigger failed (non-fatal)"

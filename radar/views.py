@@ -1559,3 +1559,30 @@ def latest_snapshot(request):
         "stop_loss", "risk_pct", "signal_date",
     ))
     return Response(data)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Trigger Engine API
+# ─────────────────────────────────────────────────────────────────────────────
+
+@api_view(["POST"])
+@permission_classes([AllowAny])
+def trigger_engine(request):
+    """POST /api/trigger-engine/ — runs run_engine + refresh_snapshot + fetch_news"""
+    token = request.headers.get("X-Import-Token", "")
+    import os
+    if token != os.environ.get("IMPORT_API_TOKEN", ""):
+        return Response({"error": "unauthorized"}, status=401)
+
+    from django.core.management import call_command
+    import io
+
+    out = io.StringIO()
+    try:
+        call_command("run_engine", stdout=out)
+        call_command("refresh_snapshot", stdout=out)
+        call_command("fetch_news", stdout=out)
+    except Exception as e:
+        return Response({"status": "error", "detail": str(e)}, status=500)
+
+    return Response({"status": "ok", "output": out.getvalue()})
