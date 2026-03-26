@@ -37,11 +37,30 @@ def get_symbols() -> list[dict]:
     return r.json()
 
 
+def _make_session():
+    """Browser session เพื่อเลี่ยง Yahoo Finance block"""
+    session = requests.Session()
+    session.headers.update({
+        "User-Agent": (
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) "
+            "Chrome/120.0.0.0 Safari/537.36"
+        ),
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.5",
+        "Accept-Encoding": "gzip, deflate, br",
+        "Connection": "keep-alive",
+    })
+    return session
+
+_SESSION = _make_session()
+
+
 def fetch_ticker(yahoo_ticker: str, start: date, end: date) -> list[dict]:
     """ดึงราคาจาก Yahoo Finance สำหรับ ticker ตัวเดียว"""
     for attempt in range(MAX_RETRIES):
         try:
-            t = yf.Ticker(yahoo_ticker)
+            t = yf.Ticker(yahoo_ticker, session=_SESSION)
             df = t.history(
                 start=start.isoformat(),
                 end=end.isoformat(),
