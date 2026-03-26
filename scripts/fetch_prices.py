@@ -1,8 +1,8 @@
 """
-GitHub Actions — ดึงราคาหุ้นจาก Yahoo Finance แล้วส่งไปยัง VPS
+GitHub Actions — ดึงราคาหุ้นจาก Stooq (ฟรี ไม่ถูก block) แล้วส่งไปยัง VPS
 
 Environment variables (GitHub Secrets):
-    VPS_API_URL   = https://radarhoon.com
+    VPS_API_URL   = http://187.127.107.228
     VPS_API_TOKEN = <IMPORT_API_TOKEN ใน .env ของ VPS>
 
 Usage:
@@ -12,20 +12,19 @@ Usage:
 """
 
 import argparse
-import json
 import os
 import sys
 import time
 from datetime import date, timedelta
 
+import pandas as pd
 import requests
-import yfinance as yf
 
-VPS_API_URL   = os.environ.get("VPS_API_URL", "").rstrip("/")
-VPS_API_TOKEN = os.environ.get("VPS_API_TOKEN", "")
+VPS_API_URL   = os.environ.get("VPS_API_URL", "").strip().rstrip("/")
+VPS_API_TOKEN = os.environ.get("VPS_API_TOKEN", "").strip()
 
-BATCH_SIZE   = 200   # ส่ง VPS ทีละกี่แถว
-SLEEP_TICKER = 0.2   # delay ระหว่าง ticker (วินาที)
+BATCH_SIZE   = 200
+SLEEP_TICKER = 0.3
 MAX_RETRIES  = 3
 
 
@@ -37,57 +36,50 @@ def get_symbols() -> list[dict]:
     return r.json()
 
 
-def _make_session():
-    """Browser session เพื่อเลี่ยง Yahoo Finance block"""
-    session = requests.Session()
-    session.headers.update({
-        "User-Agent": (
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-            "AppleWebKit/537.36 (KHTML, like Gecko) "
-            "Chrome/120.0.0.0 Safari/537.36"
-        ),
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-        "Accept-Language": "en-US,en;q=0.5",
-        "Accept-Encoding": "gzip, deflate, br",
-        "Connection": "keep-alive",
-    })
-    return session
-
-_SESSION = _make_session()
+def to_stooq_ticker(symbol: str, yahoo: str) -> str:
+    """แปลง symbol เป็น Stooq format
+    หุ้นไทย: PTT.BK  → PTT.TH
+    หุ้น US: AAPL    → AAPL.US
+    """
+    if yahoo.upper().endswith(".BK"):
+        return f"{symbol.upper()}.TH"
+    return f"{symbol.upper()}.US"
 
 
-def fetch_ticker(yahoo_ticker: str, start: date, end: date) -> list[dict]:
-    """ดึงราคาจาก Yahoo Finance สำหรับ ticker ตัวเดียว"""
+def fetch_ticker_stooq(stooq_ticker: str, start: date, end: date) -> list[dict]:
+    """ดึงราคาจาก Stooq ผ่าน pandas_datareader"""
+    url = (
+        f"https://stooq.com/q/d/l/"
+        f"?s={stooq_ticker.lower()}&d1={start.strftime('%Y%m%d')}"
+        f"&d2={end.strftime('%Y%m%d')}&i=d"
+    )
     for attempt in range(MAX_RETRIES):
         try:
-            t = yf.Ticker(yahoo_ticker, session=_SESSION)
-            df = t.history(
-                start=start.isoformat(),
-                end=end.isoformat(),
-                auto_adjust=True,
-                actions=False,
-            )
-            if df is None or df.empty:
+            df = pd.read_csv(url)
+            if df.empty or "Close" not in df.columns:
                 return []
+            df.columns = [c.strip().title() for c in df.columns]
+            df["Date"] = pd.to_datetime(df["Date"])
+            df = df.sort_values("Date")
             rows = []
-            for idx, row in df.iterrows():
+            for _, row in df.iterrows():
                 close = row.get("Close")
-                if close is None or float(close) == 0:
+                if pd.isna(close) or float(close) == 0:
                     continue
                 rows.append({
-                    "date":   idx.date().isoformat(),
+                    "date":   row["Date"].date().isoformat(),
                     "open":   round(float(row.get("Open",  close)), 4),
                     "high":   round(float(row.get("High",  close)), 4),
                     "low":    round(float(row.get("Low",   close)), 4),
                     "close":  round(float(close), 4),
-                    "volume": int(row["Volume"]) if row.get("Volume") and str(row["Volume"]) != "nan" else 0,
+                    "volume": int(row["Volume"]) if not pd.isna(row.get("Volume", 0)) else 0,
                 })
             return rows
         except Exception as e:
             if attempt < MAX_RETRIES - 1:
                 time.sleep(2 ** attempt)
             else:
-                print(f"  ✗ {yahoo_ticker}: {e}")
+                print(f"  ✗ {stooq_ticker}: {e}")
     return []
 
 
@@ -131,7 +123,7 @@ def main():
     end   = date.today() + timedelta(days=1)
     start = date.today() - timedelta(days=args.days)
 
-    print(f"📡 ดึงข้อมูลจาก {start} ถึง {end}")
+    print(f"📡 ดึงข้อมูลจาก {start} ถึง {end} (แหล่ง: Stooq)")
 
     # ── ดึง symbols จาก VPS ──
     print("🔍 กำลังโหลดรายชื่อหุ้น...")
@@ -148,13 +140,14 @@ def main():
     ok = fail = 0
 
     for i, sym in enumerate(symbols, 1):
-        yahoo_ticker = sym["yahoo"]
         symbol       = sym["symbol"]
+        yahoo        = sym.get("yahoo", symbol)
+        stooq_ticker = to_stooq_ticker(symbol, yahoo)
 
-        rows = fetch_ticker(yahoo_ticker, start, end)
+        rows = fetch_ticker_stooq(stooq_ticker, start, end)
         if rows:
-            for r in rows:
-                r["symbol"] = symbol
+            for row in rows:
+                row["symbol"] = symbol
             all_records.extend(rows)
             ok += 1
         else:
