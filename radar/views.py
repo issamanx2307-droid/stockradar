@@ -571,6 +571,7 @@ def cache_invalidate(request):
 # ─── News & Sentiment API ─────────────────────────────────────────────────────
 
 @api_view(["GET"])
+@permission_classes([AllowAny])
 def news_list(request):
     """
     GET /api/news/
