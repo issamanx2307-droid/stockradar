@@ -720,3 +720,66 @@ class WatchlistTrade(models.Model):
     def __str__(self):
         sym = self.item.symbol.symbol
         return f"{self.action} {sym} {self.quantity}@{self.price}"
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# LatestSnapshot — Materialized View (managed = False)
+# ─────────────────────────────────────────────────────────────────────────────
+
+class LatestSnapshot(models.Model):
+    """
+    Materialized View ที่ join ข้อมูลล่าสุดจาก Symbol + PriceDaily + Indicator + Signal
+    ไว้ใน 1 แถวต่อหุ้น — query เร็วมาก ไม่ต้อง join หลายตาราง
+
+    Refresh: python manage.py refresh_snapshot
+    สร้างจาก: migration 0012_latest_snapshot_view.py
+    """
+
+    # ── Symbol ────────────────────────────────────────────────────────────────
+    symbol_id = models.IntegerField(primary_key=True)
+    symbol    = models.CharField(max_length=20)
+    name      = models.CharField(max_length=255)
+    exchange  = models.CharField(max_length=20)
+    sector    = models.CharField(max_length=100, blank=True)
+
+    # ── Price (ล่าสุด) ────────────────────────────────────────────────────────
+    price_date = models.DateField(null=True)
+    close      = models.DecimalField(max_digits=18, decimal_places=4, null=True)
+    open       = models.DecimalField(max_digits=18, decimal_places=4, null=True)
+    high       = models.DecimalField(max_digits=18, decimal_places=4, null=True)
+    low        = models.DecimalField(max_digits=18, decimal_places=4, null=True)
+    volume     = models.BigIntegerField(null=True)
+
+    # ── Indicator (ล่าสุด) ───────────────────────────────────────────────────
+    ema20           = models.DecimalField(max_digits=18, decimal_places=4, null=True)
+    ema50           = models.DecimalField(max_digits=18, decimal_places=4, null=True)
+    ema200          = models.DecimalField(max_digits=18, decimal_places=4, null=True)
+    rsi             = models.DecimalField(max_digits=6,  decimal_places=2, null=True)
+    macd            = models.DecimalField(max_digits=18, decimal_places=4, null=True)
+    macd_signal     = models.DecimalField(max_digits=18, decimal_places=4, null=True)
+    macd_hist       = models.DecimalField(max_digits=18, decimal_places=4, null=True)
+    adx14           = models.DecimalField(max_digits=6,  decimal_places=2, null=True)
+    atr14           = models.DecimalField(max_digits=18, decimal_places=4, null=True)
+    bb_upper        = models.DecimalField(max_digits=18, decimal_places=4, null=True)
+    bb_lower        = models.DecimalField(max_digits=18, decimal_places=4, null=True)
+    highest_high_20 = models.DecimalField(max_digits=18, decimal_places=4, null=True)
+    lowest_low_20   = models.DecimalField(max_digits=18, decimal_places=4, null=True)
+    volume_avg20    = models.BigIntegerField(null=True)
+
+    # ── Signal (ล่าสุด) ──────────────────────────────────────────────────────
+    signal_type  = models.CharField(max_length=20, null=True)
+    direction    = models.CharField(max_length=10, null=True)
+    signal_score = models.DecimalField(max_digits=6, decimal_places=2, null=True)
+    stop_loss    = models.DecimalField(max_digits=18, decimal_places=4, null=True)
+    risk_pct     = models.DecimalField(max_digits=6,  decimal_places=2, null=True)
+    signal_date  = models.DateTimeField(null=True)
+
+    class Meta:
+        managed  = False          # Django ไม่สร้าง/ลบตาราง — จัดการโดย migration SQL
+        db_table = "radar_latest_snapshot"
+        ordering = ["-signal_score"]
+        verbose_name        = "Latest Snapshot"
+        verbose_name_plural = "Latest Snapshots"
+
+    def __str__(self):
+        return f"{self.symbol} | {self.close} | {self.direction} {self.signal_score}"

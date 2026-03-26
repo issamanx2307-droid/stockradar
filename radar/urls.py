@@ -46,4 +46,6 @@ urlpatterns = [
     # ── GitHub Actions Data Import ──
     path("symbols-export/",            views.symbols_export,        name="symbols-export"),
     path("import-prices/",             views.import_prices,         name="import-prices"),
+    # ── Latest Snapshot (Materialized View) ──
+    path("snapshot/",                  views.latest_snapshot,       name="latest-snapshot"),
 ]

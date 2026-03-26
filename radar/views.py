@@ -1511,3 +1511,51 @@ def import_prices(request):
                 skipped += 1
 
     return Response({"imported": imported, "skipped": skipped})
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Latest Snapshot API
+# ─────────────────────────────────────────────────────────────────────────────
+
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def latest_snapshot(request):
+    """
+    GET /api/snapshot/
+    คืนข้อมูล latest_snapshot ทุกหุ้น (ราคา + indicator + signal ล่าสุด)
+
+    Query params:
+      ?exchange=SET          — กรอง exchange
+      ?direction=LONG        — กรอง direction
+      ?limit=50              — จำกัดจำนวน (default=100)
+      ?min_score=60          — กรอง signal_score >= ค่านี้
+    """
+    from .models import LatestSnapshot
+
+    qs = LatestSnapshot.objects.all()
+
+    exchange  = request.query_params.get("exchange")
+    direction = request.query_params.get("direction")
+    min_score = request.query_params.get("min_score")
+    limit     = int(request.query_params.get("limit", 100))
+
+    if exchange:
+        qs = qs.filter(exchange=exchange.upper())
+    if direction:
+        qs = qs.filter(direction=direction.upper())
+    if min_score:
+        qs = qs.filter(signal_score__gte=float(min_score))
+
+    qs = qs.order_by("-signal_score")[:limit]
+
+    data = list(qs.values(
+        "symbol", "name", "exchange", "sector",
+        "price_date", "close", "open", "high", "low", "volume",
+        "ema20", "ema50", "ema200",
+        "rsi", "macd", "macd_hist", "adx14", "atr14",
+        "bb_upper", "bb_lower",
+        "highest_high_20", "lowest_low_20", "volume_avg20",
+        "signal_type", "direction", "signal_score",
+        "stop_loss", "risk_pct", "signal_date",
+    ))
+    return Response(data)

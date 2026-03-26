@@ -36,4 +36,9 @@ app.conf.beat_schedule = {
         "task": "radar.tasks.generate_all_signals",
         "schedule": crontab(hour=19, minute=0, day_of_week="1-5"),
     },
+    # Refresh Materialized View หลัง signal เสร็จ (19:15 น.)
+    "refresh-snapshot-รายวัน": {
+        "task": "radar.tasks.refresh_latest_snapshot",
+        "schedule": crontab(hour=19, minute=15, day_of_week="1-5"),
+    },
 }

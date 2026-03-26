@@ -214,6 +214,28 @@ def _generate_signals_for_symbol(sym_obj) -> int:
 
 
 # ---------------------------------------------------------------------------
+# Task: Refresh Materialized View
+# ---------------------------------------------------------------------------
+
+@shared_task(name="radar.tasks.refresh_latest_snapshot")
+def refresh_latest_snapshot():
+    """
+    REFRESH MATERIALIZED VIEW CONCURRENTLY radar_latest_snapshot
+    รันหลัง generate_all_signals เสร็จ (19:15 น.)
+    """
+    from django.db import connection
+    import time
+    t0 = time.time()
+    with connection.cursor() as cur:
+        cur.execute(
+            "REFRESH MATERIALIZED VIEW CONCURRENTLY radar_latest_snapshot;"
+        )
+    elapsed = round(time.time() - t0, 2)
+    logger.info("✅ Refreshed radar_latest_snapshot in %ss", elapsed)
+    return {"elapsed": elapsed}
+
+
+# ---------------------------------------------------------------------------
 # ฟังก์ชันช่วย
 # ---------------------------------------------------------------------------
 
