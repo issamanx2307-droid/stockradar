@@ -776,7 +776,7 @@ export default function LandingPage() {
               border: "1px solid rgba(255,255,255,.06)",
               borderRadius: 16, color: "#4a5a70", fontSize: 14,
             }}>
-              📰 ข่าวกำลังโหลด — เปิดใช้งานหลัง Login เพื่อดูข่าวเต็มรูปแบบ
+              📰 ยังไม่มีข่าวในระบบ — ระบบจะดึงข่าวอัตโนมัติทุกวัน
             </div>
           ) : (
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))", gap: 14 }}>

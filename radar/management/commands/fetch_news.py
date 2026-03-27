@@ -12,16 +12,24 @@ import datetime
 
 RSS_FEEDS = [
     {
-        "url": "https://news.google.com/rss/search?q=หุ้น+ตลาดหุ้น&hl=th&gl=TH&ceid=TH:th",
+        "url": "https://news.google.com/rss/search?q=หุ้น+ตลาดหลักทรัพย์&hl=th&gl=TH&ceid=TH:th",
         "source": "GOOGLE",
     },
     {
-        "url": "https://www.khaohoon.com/feed/",
-        "source": "OTHER",
+        "url": "https://news.google.com/rss/search?q=stock+market+NYSE+NASDAQ&hl=en&gl=US&ceid=US:en",
+        "source": "GOOGLE",
     },
     {
-        "url": "https://www.set.or.th/th/market/news-and-alert/news",
-        "source": "SET",
+        "url": "https://feeds.reuters.com/reuters/businessNews",
+        "source": "REUTERS",
+    },
+    {
+        "url": "https://www.bangkokpost.com/rss/data/business.xml",
+        "source": "BANGKOKPOST",
+    },
+    {
+        "url": "https://www.thansettakij.com/rss.xml",
+        "source": "THANSETTAKIJ",
     },
 ]
 
