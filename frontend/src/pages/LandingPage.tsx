@@ -1,7 +1,7 @@
 /**
  * pages/LandingPage.tsx
  * Landing page สำหรับ radarhoon.com
- * — Hero / Features / News (auto-update 5 นาที) / Pricing / Footer
+ * — Hero / Features / Pricing / Footer
  * — TickerTape ดัชนีวิ่งด้านล่าง
  */
 import { useState, useEffect, useRef } from "react"
@@ -13,41 +13,6 @@ const GOOGLE_CLIENT_ID = (import.meta as any).env.VITE_GOOGLE_CLIENT_ID || ""
 
 declare global {
   interface Window { google?: any; handleGoogleCredential?: (r: any) => void }
-}
-
-// ── News types ────────────────────────────────────────────────────────────────
-interface NewsItem {
-  id: number
-  title: string
-  summary?: string
-  url?: string
-  source?: string
-  sentiment?: string
-  sentiment_score?: number
-  published_at?: string
-  related_symbols?: string[]
-}
-
-// ── Helpers ───────────────────────────────────────────────────────────────────
-function timeAgo(dateStr?: string): string {
-  if (!dateStr) return ""
-  const d = new Date(dateStr)
-  const diff = (Date.now() - d.getTime()) / 1000
-  if (diff < 60) return "เมื่อกี้"
-  if (diff < 3600) return `${Math.floor(diff / 60)} นาทีที่แล้ว`
-  if (diff < 86400) return `${Math.floor(diff / 3600)} ชั่วโมงที่แล้ว`
-  return `${Math.floor(diff / 86400)} วันที่แล้ว`
-}
-
-function sentimentColor(s?: string) {
-  if (s === "BULLISH") return "#00e676"
-  if (s === "BEARISH") return "#ff5252"
-  return "#ffd740"
-}
-function sentimentLabel(s?: string) {
-  if (s === "BULLISH") return "บวก"
-  if (s === "BEARISH") return "ลบ"
-  return "กลาง"
 }
 
 // ── Sub-components ─────────────────────────────────────────────────────────────
@@ -162,8 +127,6 @@ export default function LandingPage() {
   const { loginWithGoogle } = useAuth()
   const [error, setError] = useState("")
   const [loginLoading, setLoginLoading] = useState(false)
-  const [news, setNews] = useState<NewsItem[]>([])
-  const [newsLoading, setNewsLoading] = useState(true)
   const [topSignals, setTopSignals] = useState<TopSignal[]>([])
   const [lastUpdate, setLastUpdate] = useState("")
   const [blinkIdx, setBlinkIdx] = useState(0)
@@ -226,27 +189,6 @@ export default function LandingPage() {
   useEffect(() => {
     const iv = setInterval(() => setBlinkIdx(i => (i + 1) % 7), 2000)
     return () => clearInterval(iv)
-  }, [])
-
-  // ── News fetch (auto-update ทุก 5 นาที) ─────────────────────────────────────
-  useEffect(() => {
-    let cancelled = false
-    async function loadNews() {
-      try {
-        const res = await fetch(`${API_BASE}/news/?days=30&limit=6`)
-        const d = await res.json()
-        if (!cancelled) {
-          const items: NewsItem[] = d.results ?? d.news ?? d ?? []
-          setNews(items.slice(0, 6))
-        }
-      } catch {
-        // ไม่มีข่าว ไม่แสดง error
-      }
-      if (!cancelled) setNewsLoading(false)
-    }
-    loadNews()
-    const iv = setInterval(loadNews, 5 * 60 * 1000)
-    return () => { cancelled = true; clearInterval(iv) }
   }, [])
 
   // ── Scroll-spy animation (Intersection Observer) ─────────────────────────────
@@ -314,19 +256,6 @@ export default function LandingPage() {
         }
         .lp-section { padding: 80px 0; }
         .lp-container { max-width: 1140px; margin: 0 auto; padding: 0 24px; }
-        .news-card {
-          padding: 18px 20px;
-          background: rgba(255,255,255,.03);
-          border: 1px solid rgba(255,255,255,.07);
-          border-radius: 12px;
-          transition: border-color .2s, background .2s;
-          text-decoration: none;
-          display: block;
-        }
-        .news-card:hover {
-          border-color: rgba(0,212,255,.3);
-          background: rgba(0,212,255,.04);
-        }
         @keyframes rowBlink {
           0%,100% { background: transparent; }
           50%      { background: rgba(0,212,255,.06); }
@@ -371,7 +300,7 @@ export default function LandingPage() {
         {/* Nav links */}
         <div className="lp-hide-mobile" style={{ display: "flex", alignItems: "center", gap: 28 }}>
           {[
-            ["#features", "ฟีเจอร์"], ["#news", "ข่าวตลาด"], ["#pricing", "ราคา"],
+            ["#features", "ฟีเจอร์"], ["#pricing", "ราคา"],
           ].map(([href, label]) => (
             <a key={href} href={href} className="lp-nav-link">{label}</a>
           ))}
@@ -740,98 +669,6 @@ export default function LandingPage() {
               </div>
             ))}
           </div>
-        </div>
-      </section>
-
-      {/* ── NEWS ────────────────────────────────────────────────────── */}
-      <section id="news" className="lp-section">
-        <div className="lp-container">
-          <div className="lp-fade" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 36, flexWrap: "wrap", gap: 12 }}>
-            <div>
-              <div style={{ fontSize: 13, color: "#00d4ff", fontWeight: 700, letterSpacing: 2, marginBottom: 8 }}>
-                MARKET NEWS
-              </div>
-              <h2 style={{ fontSize: 28, fontWeight: 800, margin: 0 }}>ข่าวตลาดล่าสุด</h2>
-            </div>
-            <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, color: "#4a5a70" }}>
-              <span style={{ animation: "blinkDot 2s ease-in-out infinite", color: "#00e676", fontSize: 8 }}>●</span>
-              อัปเดตอัตโนมัติทุก 5 นาที
-            </div>
-          </div>
-
-          {newsLoading ? (
-            <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-              {[1, 2, 3].map(i => (
-                <div key={i} style={{
-                  flex: 1, minWidth: 280, height: 100,
-                  background: "rgba(255,255,255,.03)", borderRadius: 12,
-                  animation: "glowPulse 1.5s ease-in-out infinite",
-                }} />
-              ))}
-            </div>
-          ) : news.length === 0 ? (
-            <div style={{
-              padding: "40px 24px", textAlign: "center",
-              background: "rgba(255,255,255,.02)",
-              border: "1px solid rgba(255,255,255,.06)",
-              borderRadius: 16, color: "#4a5a70", fontSize: 14,
-            }}>
-              📰 ยังไม่มีข่าวในระบบ — ระบบจะดึงข่าวอัตโนมัติทุกวัน
-            </div>
-          ) : (
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))", gap: 14 }}>
-              {news.map((item, i) => (
-                <a
-                  key={item.id ?? i}
-                  href={item.url || "#"}
-                  target={item.url ? "_blank" : undefined}
-                  rel="noopener noreferrer"
-                  className={`news-card lp-fade lp-fade-delay-${Math.min(i + 1, 4)}`}
-                >
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
-                    <span style={{
-                      fontSize: 11, padding: "2px 10px", borderRadius: 4,
-                      background: `${sentimentColor(item.sentiment)}18`,
-                      color: sentimentColor(item.sentiment),
-                      border: `1px solid ${sentimentColor(item.sentiment)}40`,
-                      fontWeight: 700, letterSpacing: .5,
-                    }}>
-                      {sentimentLabel(item.sentiment)}
-                    </span>
-                    <span style={{ fontSize: 11, color: "#4a5a70" }}>
-                      {item.source && <span style={{ marginRight: 6 }}>{item.source}</span>}
-                      {timeAgo(item.published_at)}
-                    </span>
-                  </div>
-                  <div style={{ fontSize: 14, fontWeight: 600, color: "#d0dde8", lineHeight: 1.5, marginBottom: 6 }}>
-                    {item.title}
-                  </div>
-                  {item.summary && (
-                    <div style={{
-                      fontSize: 12, color: "#5a6e80", lineHeight: 1.6,
-                      overflow: "hidden", display: "-webkit-box",
-                      WebkitLineClamp: 2, WebkitBoxOrient: "vertical",
-                    }}>
-                      {item.summary}
-                    </div>
-                  )}
-                  {item.related_symbols && item.related_symbols.length > 0 && (
-                    <div style={{ marginTop: 8, display: "flex", gap: 6, flexWrap: "wrap" }}>
-                      {item.related_symbols.slice(0, 4).map(sym => (
-                        <span key={sym} style={{
-                          fontSize: 10, padding: "1px 7px", borderRadius: 3,
-                          background: "rgba(0,212,255,.08)", color: "#00d4ff",
-                          border: "1px solid rgba(0,212,255,.2)",
-                        }}>
-                          {sym}
-                        </span>
-                      ))}
-                    </div>
-                  )}
-                </a>
-              ))}
-            </div>
-          )}
         </div>
       </section>
 
