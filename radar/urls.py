@@ -50,4 +50,8 @@ urlpatterns = [
     path("snapshot/",                  views.latest_snapshot,       name="latest-snapshot"),
     # ── Engine Trigger ──
     path("trigger-engine/",            views.trigger_engine),
+    # ── Admin API ──
+    path("admin/stats/",               views.admin_stats,            name="admin-stats"),
+    path("admin/fetch-news/",          views.admin_fetch_news,       name="admin-fetch-news"),
+    path("admin/refresh-snapshot/",    views.admin_refresh_snapshot, name="admin-refresh-snapshot"),
 ]

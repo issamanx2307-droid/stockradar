@@ -9,6 +9,7 @@ export interface UserInfo {
   id: number; username: string; email: string
   first_name: string; picture?: string
   tier: string; plan: any
+  is_staff?: boolean; is_superuser?: boolean
 }
 
 interface AuthCtx {

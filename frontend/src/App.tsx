@@ -20,33 +20,48 @@ import Portfolio from "./pages/Portfolio"
 import EngineBacktest from "./pages/EngineBacktest"
 import Watchlist from "./pages/Watchlist"
 import Subscription from "./pages/Subscription"
+import Fundamental from "./pages/Fundamental"
+import EconomicCalendar from "./pages/EconomicCalendar"
+import AdminPanel from "./pages/AdminPanel"
 import { AutoTermHighlight, TermAssistantProvider, TermAssistantToggle } from "./components/TermAssistant"
 import TickerTape from "./components/TickerTape"
 import "./App.css"
 
-const NAV_ITEMS = [
-  { id:"dashboard",    label:"ราดาร์",            icon:"📡" },
-  { id:"engine_scan",  label:"Top Opportunities",  icon:"🔥" },
-  { id:"watchlist",    label:"Watchlist",           icon:"⭐" },
-  { id:"news",         label:"ข่าว & Sentiment",   icon:"📰" },
-  { id:"analyze",      label:"วิเคราะห์หุ้น",     icon:"🔬" },
-  { id:"portfolio",    label:"Portfolio",           icon:"💼" },
-  { id:"scanner",      label:"สแกนหุ้น",           icon:"🔍" },
-  { id:"chart",        label:"กราฟ",               icon:"📈" },
-  { id:"strategy",     label:"กลยุทธ์",             icon:"🎯" },
-  { id:"backtest",     label:"Backtest",            icon:"⏪" },
-  { id:"guide",        label:"คำแนะนำ",            icon:"💡" },
-  { id:"qna",          label:"ถาม-ตอบ",            icon:"💬" },
-  { id:"subscription", label:"สมาชิก",             icon:"💳" },
-  { id:"profile",      label:"โปรไฟล์",            icon:"👤" },
-  { id:"contact",      label:"ติดต่อเรา",          icon:"📞" },
+// ── เมนูสำหรับ User ทั่วไป ───────────────────────────────────────────────────
+const USER_NAV: { id: string; label: string; icon: string }[] = [
+  { id: "dashboard",    label: "ราดาร์",            icon: "📡" },
+  { id: "engine_scan",  label: "Top Opportunities",  icon: "🔥" },
+  { id: "watchlist",    label: "Watchlist",           icon: "⭐" },
+  { id: "news",         label: "ข่าว & Sentiment",   icon: "📰" },
+  { id: "analyze",      label: "วิเคราะห์หุ้น",     icon: "🔬" },
+  { id: "fundamental",  label: "Fundamental",         icon: "📊" },
+  { id: "portfolio",    label: "Portfolio",           icon: "💼" },
+  { id: "scanner",      label: "สแกนหุ้น",           icon: "🔍" },
+  { id: "chart",        label: "กราฟ",               icon: "📈" },
+  { id: "calendar",     label: "ปฏิทินเศรษฐกิจ",    icon: "📅" },
+  { id: "strategy",     label: "กลยุทธ์",             icon: "🎯" },
+  { id: "backtest",     label: "Backtest",            icon: "⏪" },
+  { id: "guide",        label: "คำแนะนำ",            icon: "💡" },
+  { id: "qna",          label: "ถาม-ตอบ",            icon: "💬" },
+  { id: "subscription", label: "สมาชิก",             icon: "💳" },
+  { id: "profile",      label: "โปรไฟล์",            icon: "👤" },
+  { id: "contact",      label: "ติดต่อเรา",          icon: "📞" },
+]
+
+// ── เมนูสำหรับ Superadmin (ควบคุมระบบอย่างเดียว) ────────────────────────────
+const ADMIN_NAV: { id: string; label: string; icon: string }[] = [
+  { id: "admin_panel",  label: "ควบคุมระบบ",        icon: "⚙️" },
+  { id: "profile",      label: "โปรไฟล์",            icon: "👤" },
 ]
 
 function AppInner() {
   const { user, loading } = useAuth()
-  const [page, setPage]           = useState("dashboard")
-  const [history, setHistory]     = useState<string[]>([])
-  const [chartSymbol, setChartSymbol]   = useState<string | null>(null)
+  const isAdmin = user?.is_staff || user?.is_superuser
+  const NAV_ITEMS = isAdmin ? ADMIN_NAV : USER_NAV
+
+  const [page, setPage] = useState(isAdmin ? "admin_panel" : "dashboard")
+  const [history, setHistory] = useState<string[]>([])
+  const [chartSymbol, setChartSymbol]     = useState<string | null>(null)
   const [analyzeSymbol, setAnalyzeSymbol] = useState<string | null>(null)
   const ws = useRadarWS()
 
@@ -66,19 +81,17 @@ function AppInner() {
     setAnalyzeSymbol(symbol); setHistory(h => [...h, page]); setPage("analyze")
   }
 
-  // Loading
   if (loading) {
     return (
-      <div style={{ height:"100vh", display:"flex", alignItems:"center",
-        justifyContent:"center", background:"var(--bg-main,#0a1929)", flexDirection:"column", gap:16 }}>
-        <div style={{ fontSize:40 }}>◈</div>
+      <div style={{ height: "100vh", display: "flex", alignItems: "center",
+        justifyContent: "center", background: "var(--bg-main,#0a1929)", flexDirection: "column", gap: 16 }}>
+        <div style={{ fontSize: 40 }}>◈</div>
         <div className="loading-spinner" />
-        <div style={{ color:"var(--text-muted)", fontSize:13 }}>กำลังโหลด...</div>
+        <div style={{ color: "var(--text-muted)", fontSize: 13 }}>กำลังโหลด...</div>
       </div>
     )
   }
 
-  // ยังไม่ได้ login → แสดง Landing Page
   if (!user) return <LandingPage />
 
   return (
@@ -91,6 +104,15 @@ function AppInner() {
           <div className="sidebar-logo">
             <span className="logo-icon">◈</span>
             <span className="logo-text">Radar<br /><small>หุ้น</small></span>
+            {isAdmin && (
+              <span style={{
+                fontSize: 9, fontWeight: 800, color: "#ff6d00",
+                background: "rgba(255,109,0,.15)", border: "1px solid rgba(255,109,0,.4)",
+                borderRadius: 4, padding: "1px 5px", letterSpacing: 1, marginLeft: 4,
+              }}>
+                ADMIN
+              </span>
+            )}
           </div>
           <nav className="sidebar-nav">
             {NAV_ITEMS.map(item => (
@@ -105,11 +127,11 @@ function AppInner() {
           <div className="sidebar-footer">
             <UserBadge onSubscription={() => navigateTo("subscription")} />
             <span className="version-badge">v5.1</span>
-            <div style={{ marginTop:8 }}><TermAssistantToggle /></div>
+            <div style={{ marginTop: 8 }}><TermAssistantToggle /></div>
           </div>
         </aside>
 
-        <main className="main-content" style={{ paddingBottom:34 }}>
+        <main className="main-content" style={{ paddingBottom: 34 }}>
           {history.length > 0 && (
             <div className="back-btn-container">
               <button className="back-btn" onClick={goBack}>
@@ -118,14 +140,20 @@ function AppInner() {
             </div>
           )}
           <AutoTermHighlight>
+            {/* Admin pages */}
+            {page === "admin_panel"  && <AdminPanel />}
+
+            {/* User pages */}
             {page === "dashboard"    && <Dashboard ws={ws} onOpenChart={openChart} />}
             {page === "engine_scan"  && <EngineScan onOpenChart={openChart} />}
             {page === "watchlist"    && <Watchlist onOpenChart={openChart} />}
             {page === "news"         && <News onOpenChart={openChart} />}
             {page === "analyze"      && <Analyze onOpenChart={openChart} initialSymbol={analyzeSymbol} />}
+            {page === "fundamental"  && <Fundamental onOpenChart={openChart} />}
             {page === "portfolio"    && <Portfolio onOpenChart={openChart} />}
             {page === "scanner"      && <Scanner onOpenChart={openChart} onAnalyze={openAnalyze} />}
             {page === "chart"        && <Chart symbol={chartSymbol} />}
+            {page === "calendar"     && <EconomicCalendar />}
             {page === "strategy"     && <StrategyBuilder />}
             {page === "backtest"     && <EngineBacktest onOpenChart={openChart} />}
             {page === "guide"        && <Guide />}

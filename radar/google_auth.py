@@ -151,6 +151,8 @@ def me(request):
         "tier":       tier,
         "plan":       plan,
         "expires_at": expires_at,
+        "is_staff":   request.user.is_staff,
+        "is_superuser": request.user.is_superuser,
     })
 
 
