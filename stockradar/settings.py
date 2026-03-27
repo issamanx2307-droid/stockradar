@@ -126,6 +126,9 @@ if REDIS_URL:
             "CONFIG": {"hosts": [REDIS_URL]},
         }
     }
+    # Celery Broker + Result Backend (Redis)
+    CELERY_BROKER_URL = REDIS_URL
+    CELERY_RESULT_BACKEND = REDIS_URL
 else:
     CACHES = {
         "default": {
@@ -137,6 +140,15 @@ else:
             "BACKEND": "channels.layers.InMemoryChannelLayer",
         }
     }
+    # Celery fallback (local dev)
+    CELERY_BROKER_URL = "redis://127.0.0.1:6379/0"
+    CELERY_RESULT_BACKEND = "redis://127.0.0.1:6379/0"
+
+# Celery shared settings
+CELERY_ACCEPT_CONTENT = ["json"]
+CELERY_TASK_SERIALIZER = "json"
+CELERY_RESULT_SERIALIZER = "json"
+CELERY_TIMEZONE = "Asia/Bangkok"
 
 # ---------------------------------------------------------------------------
 # Django REST Framework
