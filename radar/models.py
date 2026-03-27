@@ -612,7 +612,7 @@ class NewsItem(models.Model):
     # ── เนื้อหาข่าว ──
     title       = models.CharField(max_length=512, verbose_name="หัวข้อ")
     summary     = models.TextField(blank=True, verbose_name="สรุปข่าว")
-    url         = models.URLField(max_length=1024, unique=True, verbose_name="ลิงก์ข่าว")
+    url         = models.URLField(max_length=2048, unique=True, verbose_name="ลิงก์ข่าว")
     source      = models.CharField(max_length=20, choices=SOURCE_CHOICES,
                                    default="OTHER", db_index=True, verbose_name="แหล่งข่าว")
     published_at = models.DateTimeField(db_index=True, verbose_name="เวลาเผยแพร่")

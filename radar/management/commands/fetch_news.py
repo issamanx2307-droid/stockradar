@@ -156,7 +156,7 @@ class Command(BaseCommand):
                 if total_saved >= LIMIT_PER_RUN:
                     break
 
-                item_url = entry.get("url", "").strip()
+                item_url = entry.get("url", "").strip()[:2048]
                 title = entry.get("title", "").strip()
 
                 if not item_url or not title:
