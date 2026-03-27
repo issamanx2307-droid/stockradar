@@ -100,6 +100,23 @@ function PlanCard({
   )
 }
 
+// ── Market data types ─────────────────────────────────────────────────────────
+interface TickerItem {
+  symbol: string; label: string; type: string
+  price: number; change: number; change_pct: number; up: boolean
+}
+interface NewsItem {
+  id: number; title: string; url?: string; source?: string; published_at?: string
+}
+
+function timeAgo(d?: string) {
+  if (!d) return ""
+  const s = (Date.now() - new Date(d).getTime()) / 1000
+  if (s < 3600) return `${Math.floor(s / 60)} นาทีที่แล้ว`
+  if (s < 86400) return `${Math.floor(s / 3600)} ชม.ที่แล้ว`
+  return `${Math.floor(s / 86400)} วันที่แล้ว`
+}
+
 // ── Signal types ──────────────────────────────────────────────────────────────
 interface TopSignal {
   id: number
@@ -130,6 +147,8 @@ export default function LandingPage() {
   const [topSignals, setTopSignals] = useState<TopSignal[]>([])
   const [lastUpdate, setLastUpdate] = useState("")
   const [blinkIdx, setBlinkIdx] = useState(0)
+  const [tickerItems, setTickerItems] = useState<TickerItem[]>([])
+  const [newsItems, setNewsItems] = useState<NewsItem[]>([])
   const heroRef = useRef<HTMLDivElement>(null)
 
   // ── Google login init ───────────────────────────────────────────────────────
@@ -189,6 +208,21 @@ export default function LandingPage() {
   useEffect(() => {
     const iv = setInterval(() => setBlinkIdx(i => (i + 1) % 7), 2000)
     return () => clearInterval(iv)
+  }, [])
+
+  // ── Market data fetch (ticker + news) ────────────────────────────────────────
+  useEffect(() => {
+    fetch(`${API_BASE}/ticker/`)
+      .then(r => r.json())
+      .then(d => { if (d.items?.length) setTickerItems(d.items) })
+      .catch(() => {})
+    fetch(`${API_BASE}/news/?limit=8&days=30`)
+      .then(r => r.json())
+      .then(d => {
+        const items: NewsItem[] = d.results ?? d.news ?? []
+        if (items.length) setNewsItems(items.slice(0, 8))
+      })
+      .catch(() => {})
   }, [])
 
   // ── Scroll-spy animation (Intersection Observer) ─────────────────────────────
@@ -671,6 +705,95 @@ export default function LandingPage() {
           </div>
         </div>
       </section>
+
+      {/* ── MARKET STATS ────────────────────────────────────────────── */}
+      {tickerItems.length > 0 && (
+        <section style={{ padding: "60px 0", borderTop: "1px solid rgba(255,255,255,.05)" }}>
+          <div className="lp-container">
+            <div className="lp-fade" style={{ marginBottom: 32 }}>
+              <div style={{ fontSize: 13, color: "#00d4ff", fontWeight: 700, letterSpacing: 2, marginBottom: 8 }}>
+                MARKET TODAY
+              </div>
+              <h2 style={{ fontSize: 28, fontWeight: 800, margin: 0 }}>สถิติตลาดวันนี้</h2>
+            </div>
+            <div className="lp-fade lp-fade-delay-1" style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))",
+              gap: 12,
+            }}>
+              {tickerItems.map((t, i) => (
+                <div key={t.symbol} className={`lp-fade-delay-${Math.min(i + 1, 4)}`} style={{
+                  padding: "18px 16px",
+                  background: "rgba(255,255,255,.03)",
+                  border: `1px solid ${t.up ? "rgba(0,230,118,.15)" : "rgba(255,82,82,.15)"}`,
+                  borderRadius: 14,
+                  transition: "transform .2s",
+                }}
+                  onMouseEnter={e => (e.currentTarget as HTMLElement).style.transform = "translateY(-3px)"}
+                  onMouseLeave={e => (e.currentTarget as HTMLElement).style.transform = "translateY(0)"}
+                >
+                  <div style={{ fontSize: 11, color: "#4a5a70", marginBottom: 6, letterSpacing: .5 }}>
+                    {t.label}
+                  </div>
+                  <div style={{ fontSize: 20, fontWeight: 800, color: "#e2e8f0", marginBottom: 4 }}>
+                    {t.price.toLocaleString("en-US", { maximumFractionDigits: 2 })}
+                  </div>
+                  <div style={{
+                    fontSize: 13, fontWeight: 700,
+                    color: t.up ? "#00e676" : "#ff5252",
+                  }}>
+                    {t.up ? "▲" : "▼"} {Math.abs(t.change_pct).toFixed(2)}%
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* ── NEWS ────────────────────────────────────────────────────── */}
+      {newsItems.length > 0 && (
+        <section style={{ padding: "60px 0", borderTop: "1px solid rgba(255,255,255,.05)" }}>
+          <div className="lp-container">
+            <div className="lp-fade" style={{ marginBottom: 28 }}>
+              <div style={{ fontSize: 13, color: "#00d4ff", fontWeight: 700, letterSpacing: 2, marginBottom: 8 }}>
+                MARKET NEWS
+              </div>
+              <h2 style={{ fontSize: 28, fontWeight: 800, margin: 0 }}>ข่าวตลาดล่าสุด</h2>
+            </div>
+            <div className="lp-fade lp-fade-delay-1" style={{ display: "flex", flexDirection: "column", gap: 0 }}>
+              {newsItems.map((n, i) => (
+                <a
+                  key={n.id}
+                  href={n.url || "#"}
+                  target={n.url ? "_blank" : undefined}
+                  rel="noopener noreferrer"
+                  style={{
+                    display: "flex", alignItems: "baseline", gap: 14,
+                    padding: "14px 0",
+                    borderBottom: "1px solid rgba(255,255,255,.05)",
+                    textDecoration: "none",
+                    transition: "background .15s",
+                  }}
+                  onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = "rgba(0,212,255,.03)"}
+                  onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = "transparent"}
+                >
+                  <span style={{ fontSize: 12, color: "#2a3a50", minWidth: 24, fontWeight: 700 }}>
+                    {String(i + 1).padStart(2, "0")}
+                  </span>
+                  <span style={{ flex: 1, fontSize: 14, color: "#c8d8e8", lineHeight: 1.5 }}>
+                    {n.title}
+                  </span>
+                  <span style={{ fontSize: 11, color: "#3a4a60", whiteSpace: "nowrap", flexShrink: 0 }}>
+                    {n.source && <span style={{ marginRight: 8 }}>{n.source}</span>}
+                    {timeAgo(n.published_at)}
+                  </span>
+                </a>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* ── PRICING ─────────────────────────────────────────────────── */}
       <section id="pricing" style={{ padding: "80px 0", background: "rgba(255,255,255,.015)", borderTop: "1px solid rgba(255,255,255,.05)" }}>
