@@ -701,13 +701,13 @@ export default function LandingPage() {
       {topSignals.length > 0 && (
         <section style={{ padding: "60px 0", borderTop: "1px solid rgba(255,255,255,.05)" }}>
           <div className="lp-container">
-            <div className="lp-fade" style={{ marginBottom: 32 }}>
+            <div style={{ marginBottom: 32 }}>
               <div style={{ fontSize: 13, color: "#00d4ff", fontWeight: 700, letterSpacing: 2, marginBottom: 8 }}>
                 SIGNAL STATS
               </div>
               <h2 style={{ fontSize: 28, fontWeight: 800, margin: 0 }}>สัญญาณล่าสุดจากระบบ</h2>
             </div>
-            <div className="lp-fade lp-fade-delay-1" style={{
+            <div style={{
               display: "grid",
               gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))",
               gap: 12,
@@ -756,13 +756,13 @@ export default function LandingPage() {
       {newsItems.length > 0 && (
         <section style={{ padding: "60px 0", borderTop: "1px solid rgba(255,255,255,.05)" }}>
           <div className="lp-container">
-            <div className="lp-fade" style={{ marginBottom: 28 }}>
+            <div style={{ marginBottom: 28 }}>
               <div style={{ fontSize: 13, color: "#00d4ff", fontWeight: 700, letterSpacing: 2, marginBottom: 8 }}>
                 MARKET NEWS
               </div>
               <h2 style={{ fontSize: 28, fontWeight: 800, margin: 0 }}>ข่าวตลาดล่าสุด</h2>
             </div>
-            <div className="lp-fade lp-fade-delay-1" style={{ display: "flex", flexDirection: "column", gap: 0 }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
               {newsItems.map((n, i) => (
                 <a
                   key={n.id}
