@@ -4,6 +4,7 @@ google_auth.py — รับ Google id_token จาก frontend
 """
 import logging
 from django.contrib.auth.models import User
+from django.views.decorators.csrf import csrf_exempt
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
@@ -28,6 +29,7 @@ def _verify_google_token(id_token: str) -> dict | None:
     return None
 
 
+@csrf_exempt
 @api_view(["POST"])
 @permission_classes([AllowAny])
 def google_login(request):
