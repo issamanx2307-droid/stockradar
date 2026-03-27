@@ -101,10 +101,6 @@ function PlanCard({
 }
 
 // ── Market data types ─────────────────────────────────────────────────────────
-interface TickerItem {
-  symbol: string; label: string; type: string
-  price: number; change: number; change_pct: number; up: boolean
-}
 interface NewsItem {
   id: number; title: string; url?: string; source?: string; published_at?: string
 }
@@ -147,7 +143,6 @@ export default function LandingPage() {
   const [topSignals, setTopSignals] = useState<TopSignal[]>([])
   const [lastUpdate, setLastUpdate] = useState("")
   const [blinkIdx, setBlinkIdx] = useState(0)
-  const [tickerItems, setTickerItems] = useState<TickerItem[]>([])
   const [newsItems, setNewsItems] = useState<NewsItem[]>([])
   const heroRef = useRef<HTMLDivElement>(null)
 
@@ -210,13 +205,9 @@ export default function LandingPage() {
     return () => clearInterval(iv)
   }, [])
 
-  // ── Market data fetch (ticker + news) ────────────────────────────────────────
+  // ── News fetch ────────────────────────────────────────────────────────────────
   useEffect(() => {
-    fetch(`${API_BASE}/ticker/`)
-      .then(r => r.json())
-      .then(d => { if (d.items?.length) setTickerItems(d.items) })
-      .catch(() => {})
-    fetch(`${API_BASE}/news/?limit=8&days=30`)
+    fetch(`${API_BASE}/news/?limit=8&days=365`)
       .then(r => r.json())
       .then(d => {
         const items: NewsItem[] = d.results ?? d.news ?? []
@@ -706,43 +697,53 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ── MARKET STATS ────────────────────────────────────────────── */}
-      {tickerItems.length > 0 && (
+      {/* ── SIGNAL STATS ─────────────────────────────────────────────── */}
+      {topSignals.length > 0 && (
         <section style={{ padding: "60px 0", borderTop: "1px solid rgba(255,255,255,.05)" }}>
           <div className="lp-container">
             <div className="lp-fade" style={{ marginBottom: 32 }}>
               <div style={{ fontSize: 13, color: "#00d4ff", fontWeight: 700, letterSpacing: 2, marginBottom: 8 }}>
-                MARKET TODAY
+                SIGNAL STATS
               </div>
-              <h2 style={{ fontSize: 28, fontWeight: 800, margin: 0 }}>สถิติตลาดวันนี้</h2>
+              <h2 style={{ fontSize: 28, fontWeight: 800, margin: 0 }}>สัญญาณล่าสุดจากระบบ</h2>
             </div>
             <div className="lp-fade lp-fade-delay-1" style={{
               display: "grid",
-              gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))",
+              gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))",
               gap: 12,
             }}>
-              {tickerItems.map((t, i) => (
-                <div key={t.symbol} className={`lp-fade-delay-${Math.min(i + 1, 4)}`} style={{
-                  padding: "18px 16px",
+              {topSignals.slice(0, 6).map((s, i) => (
+                <div key={s.id} style={{
+                  padding: "18px 20px",
                   background: "rgba(255,255,255,.03)",
-                  border: `1px solid ${t.up ? "rgba(0,230,118,.15)" : "rgba(255,82,82,.15)"}`,
+                  border: "1px solid rgba(0,230,118,.12)",
                   borderRadius: 14,
-                  transition: "transform .2s",
+                  transition: "transform .2s, border-color .2s",
                 }}
-                  onMouseEnter={e => (e.currentTarget as HTMLElement).style.transform = "translateY(-3px)"}
-                  onMouseLeave={e => (e.currentTarget as HTMLElement).style.transform = "translateY(0)"}
+                  onMouseEnter={e => {
+                    (e.currentTarget as HTMLElement).style.transform = "translateY(-3px)"
+                    ;(e.currentTarget as HTMLElement).style.borderColor = "rgba(0,230,118,.3)"
+                  }}
+                  onMouseLeave={e => {
+                    (e.currentTarget as HTMLElement).style.transform = "translateY(0)"
+                    ;(e.currentTarget as HTMLElement).style.borderColor = "rgba(0,230,118,.12)"
+                  }}
                 >
-                  <div style={{ fontSize: 11, color: "#4a5a70", marginBottom: 6, letterSpacing: .5 }}>
-                    {t.label}
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+                    <span style={{ fontSize: 16, fontWeight: 800, color: "#d8e8f0" }}>{s.symbol_code}</span>
+                    <span style={{
+                      fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 4,
+                      background: "rgba(0,230,118,.12)", color: "#00e676",
+                      border: "1px solid rgba(0,230,118,.25)",
+                    }}>{sigLabel(s.signal_type)}</span>
                   </div>
-                  <div style={{ fontSize: 20, fontWeight: 800, color: "#e2e8f0", marginBottom: 4 }}>
-                    {t.price.toLocaleString("en-US", { maximumFractionDigits: 2 })}
-                  </div>
-                  <div style={{
-                    fontSize: 13, fontWeight: 700,
-                    color: t.up ? "#00e676" : "#ff5252",
-                  }}>
-                    {t.up ? "▲" : "▼"} {Math.abs(t.change_pct).toFixed(2)}%
+                  <div style={{ fontSize: 12, color: "#4a5a70", marginBottom: 8 }}>{s.symbol_name ?? s.exchange ?? ""}</div>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <span style={{ fontSize: 13, color: "#6a8099" }}>Score</span>
+                    <span style={{
+                      fontSize: 18, fontWeight: 800, fontFamily: "monospace",
+                      color: s.score >= 85 ? "#00e676" : s.score >= 70 ? "#ffd740" : "#7a90a8",
+                    }}>{s.score}</span>
                   </div>
                 </div>
               ))}
