@@ -19,7 +19,6 @@ import EngineScan from "./pages/EngineScan"
 import Portfolio from "./pages/Portfolio"
 import EngineBacktest from "./pages/EngineBacktest"
 import Watchlist from "./pages/Watchlist"
-import Fundamental from "./pages/Fundamental"
 import EconomicCalendar from "./pages/EconomicCalendar"
 import Subscription from "./pages/Subscription"
 import { AutoTermHighlight, TermAssistantProvider, TermAssistantToggle } from "./components/TermAssistant"
@@ -32,7 +31,6 @@ const NAV_ITEMS = [
   { id:"watchlist",    label:"Watchlist",           icon:"⭐" },
   { id:"news",         label:"ข่าว & Sentiment",   icon:"📰" },
   { id:"analyze",      label:"วิเคราะห์หุ้น",     icon:"🔬" },
-  { id:"fundamental",  label:"Fundamental",         icon:"📊" },
   { id:"portfolio",    label:"Portfolio",           icon:"💼" },
   { id:"scanner",      label:"สแกนหุ้น",           icon:"🔍" },
   { id:"chart",        label:"กราฟ",               icon:"📈" },
@@ -127,7 +125,6 @@ function AppInner() {
             {page === "watchlist"    && <Watchlist onOpenChart={openChart} />}
             {page === "news"         && <News onOpenChart={openChart} />}
             {page === "analyze"      && <Analyze onOpenChart={openChart} initialSymbol={analyzeSymbol} />}
-            {page === "fundamental"  && <Fundamental onOpenChart={openChart} />}
             {page === "portfolio"    && <Portfolio onOpenChart={openChart} />}
             {page === "scanner"      && <Scanner onOpenChart={openChart} onAnalyze={openAnalyze} />}
             {page === "chart"        && <Chart symbol={chartSymbol} />}
