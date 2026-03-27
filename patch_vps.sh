@@ -50,6 +50,8 @@ echo "✅ Nginx reloaded"
 # ── 5. ตรวจสอบผล ──────────────────────────────────────────
 echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "⏳ รอ Daphne start (5s)..."
+sleep 5
 echo "🧪 ทดสอบ API..."
 curl -sI https://radarhoon.com/api/dashboard/ | head -5
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
