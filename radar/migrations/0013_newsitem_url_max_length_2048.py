@@ -4,7 +4,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ("radar", "0013_latestsnapshot"),
+        ("radar", "0012_latest_snapshot_view"),
     ]
 
     operations = [
