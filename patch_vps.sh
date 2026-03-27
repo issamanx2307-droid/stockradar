@@ -26,8 +26,14 @@ echo "✅ Frontend build สำเร็จ (HTTPS)"
 # ── 3. Restart Django ─────────────────────────────────────
 cd /opt/stockradar
 source .venv/bin/activate
+export DATABASE_URL="postgresql://stockradar:Radar2025Secure@localhost:5432/stockradar"
+pip install -q -r requirements.txt
 python manage.py migrate --noinput
 python manage.py collectstatic --noinput
+
+# ── ดึงข่าวครั้งแรก (seed data) ─────────────────────────
+python manage.py fetch_news && echo "✅ fetch_news สำเร็จ" || echo "⚠️  fetch_news มีปัญหา"
+
 deactivate
 
 systemctl restart stockradar
