@@ -579,12 +579,15 @@ def news_list(request):
     """
     from radar.models import NewsItem
 
+    from django.db.models import Q
     p     = request.query_params
     days  = int(p.get("days", 7))
     limit = min(int(p.get("limit", 50)), 200)
     since = timezone.now() - timedelta(days=days)
 
-    qs = NewsItem.objects.filter(published_at__gte=since).order_by("-published_at")
+    qs = NewsItem.objects.filter(
+        Q(published_at__gte=since) | Q(published_at__isnull=True)
+    ).order_by("-id")
 
     if p.get("symbol"):
         qs = qs.filter(symbols__symbol=p["symbol"].upper())
