@@ -138,12 +138,13 @@ function PlanCard({
 // ── Signal types ──────────────────────────────────────────────────────────────
 interface TopSignal {
   id: number
-  symbol: string
+  symbol_code: string
+  symbol_name?: string
   exchange?: string
   score: number
   signal_type: string
   direction: string
-  entry_price?: number
+  price?: number
   stop_loss?: number
 }
 
@@ -232,7 +233,7 @@ export default function LandingPage() {
     let cancelled = false
     async function loadNews() {
       try {
-        const res = await fetch(`${API_BASE}/news/?days=7&limit=6`)
+        const res = await fetch(`${API_BASE}/news/?days=30&limit=6`)
         const d = await res.json()
         if (!cancelled) {
           const items: NewsItem[] = d.results ?? d.news ?? d ?? []
@@ -501,8 +502,8 @@ export default function LandingPage() {
                           <div style={{ width: 60, height: 12, background: "rgba(255,255,255,.05)", borderRadius: 4 }} />
                         ) : (
                           <>
-                            <div style={{ fontWeight: 700, color: "#d8e8f0", fontSize: 14 }}>{s.symbol}</div>
-                            <div style={{ fontSize: 10, color: "#3a5a70", marginTop: 1 }}>{s.exchange ?? ""}</div>
+                            <div style={{ fontWeight: 700, color: "#d8e8f0", fontSize: 14 }}>{s.symbol_code}</div>
+                            <div style={{ fontSize: 10, color: "#3a5a70", marginTop: 1 }}>{s.symbol_name ?? s.exchange ?? ""}</div>
                           </>
                         )}
                       </div>
