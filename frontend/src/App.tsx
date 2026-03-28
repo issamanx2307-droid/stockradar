@@ -1,4 +1,4 @@
-import { useState, useRef } from "react"
+import { useState, useRef, useEffect } from "react"
 import { useRadarWS } from "./hooks/useRadarWS"
 import { WsStatus } from "./components/WsStatus"
 import { ScannerProgress } from "./components/ScannerProgress"
@@ -55,26 +55,55 @@ function AppInner() {
   const isAdmin = user?.is_staff || user?.is_superuser
   const NAV_ITEMS = isAdmin ? ADMIN_NAV : USER_NAV
 
-  const [page, setPage] = useState(isAdmin ? "admin_panel" : "dashboard")
+  // ── hash-based navigation (persist page on refresh) ──────────────────────
+  const VALID_PAGES = [
+    "dashboard","engine_scan","watchlist","news","analyze","fundamental",
+    "vi_screen","portfolio","scanner","chart","strategy","backtest",
+    "guide","profile","contact","subscription","admin_panel",
+  ]
+  function getHashPage(fallback: string) {
+    const h = window.location.hash.replace("#", "")
+    return VALID_PAGES.includes(h) ? h : fallback
+  }
+
+  const [page, setPage] = useState(() => getHashPage(isAdmin ? "admin_panel" : "dashboard"))
   const [history, setHistory] = useState<string[]>([])
   const [chartSymbol, setChartSymbol]     = useState<string | null>(null)
   const [analyzeSymbol, setAnalyzeSymbol] = useState<string | null>(null)
   const ws = useRadarWS()
 
+  // sync hash → state (browser back/forward)
+  useEffect(() => {
+    function onHashChange() {
+      const h = getHashPage(isAdmin ? "admin_panel" : "dashboard")
+      setPage(h); setHistory([])
+    }
+    window.addEventListener("hashchange", onHashChange)
+    return () => window.removeEventListener("hashchange", onHashChange)
+  }, [isAdmin])
+
   function navigateTo(id: string) {
-    if (id !== page) { setHistory([]); setPage(id) }
+    if (id !== page) {
+      setHistory([])
+      setPage(id)
+      window.location.hash = id
+    }
   }
   function goBack() {
     if (history.length > 0) {
       const prev = history[history.length - 1]
-      setHistory(h => h.slice(0, -1)); setPage(prev)
+      setHistory(h => h.slice(0, -1))
+      setPage(prev)
+      window.location.hash = prev
     }
   }
   function openChart(symbol: string) {
     setChartSymbol(symbol); setHistory(h => [...h, page]); setPage("chart")
+    window.location.hash = "chart"
   }
   function openAnalyze(symbol: string) {
     setAnalyzeSymbol(symbol); setHistory(h => [...h, page]); setPage("analyze")
+    window.location.hash = "analyze"
   }
 
   if (loading) {
