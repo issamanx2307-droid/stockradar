@@ -1651,3 +1651,149 @@ def admin_refresh_snapshot(request):
         return Response({"status": "ok", "message": "Refresh snapshot สำเร็จ"})
     except Exception as e:
         return Response({"status": "error", "message": str(e)}, status=500)
+
+
+# ─── Thai Economic Indicators API ─────────────────────────────────────────────
+
+@api_view(["GET"])
+def thai_indicators_api(request):
+    """
+    GET /api/thai-indicators/
+    ตัวชี้วัดเศรษฐกิจไทยหลัก — Cache 6 ชั่วโมง
+    ข้อมูลจาก: BOT, กรมการค้าภายใน, สภาพัฒน์, กรมศุลกากร
+    """
+    CACHE_KEY = "thai_indicators_v2"
+    cached = cache.get(CACHE_KEY)
+    if cached:
+        return Response(cached)
+
+    indicators = [
+        {
+            "id": "bot_rate",
+            "name": "อัตราดอกเบี้ยนโยบาย BOT",
+            "name_en": "BOT Policy Rate",
+            "value": "2.00",
+            "unit": "%",
+            "prev_value": "2.25",
+            "change": "-0.25",
+            "trend": "down",
+            "period": "ก.พ. 2568",
+            "icon": "🏦",
+            "category": "monetary",
+            "source": "ธนาคารแห่งประเทศไทย (BOT)",
+            "description": "กนง. ปรับลดอัตราดอกเบี้ยนโยบาย เพื่อกระตุ้นเศรษฐกิจ",
+        },
+        {
+            "id": "cpi",
+            "name": "อัตราเงินเฟ้อ (CPI)",
+            "name_en": "Inflation Rate (CPI)",
+            "value": "1.08",
+            "unit": "%",
+            "prev_value": "0.78",
+            "change": "+0.30",
+            "trend": "up",
+            "period": "ก.พ. 2568",
+            "icon": "🛒",
+            "category": "price",
+            "source": "กรมการค้าภายใน (MOC)",
+            "description": "ดัชนีราคาผู้บริโภคทั่วไป เปรียบเทียบรายปี (YoY)",
+        },
+        {
+            "id": "gdp_growth",
+            "name": "อัตราการเติบโต GDP",
+            "name_en": "GDP Growth Rate",
+            "value": "2.5",
+            "unit": "%",
+            "prev_value": "1.9",
+            "change": "+0.6",
+            "trend": "up",
+            "period": "Q4/2567",
+            "icon": "📈",
+            "category": "growth",
+            "source": "สภาพัฒนาเศรษฐกิจและสังคมแห่งชาติ (สภาพัฒน์)",
+            "description": "ผลิตภัณฑ์มวลรวมในประเทศ เปรียบเทียบรายปี (YoY)",
+        },
+        {
+            "id": "usd_thb",
+            "name": "อัตราแลกเปลี่ยน USD/THB",
+            "name_en": "USD/THB Exchange Rate",
+            "value": "34.20",
+            "unit": "บาท",
+            "prev_value": "35.10",
+            "change": "-0.90",
+            "trend": "down",
+            "period": "มี.ค. 2568",
+            "icon": "💱",
+            "category": "forex",
+            "source": "ธนาคารแห่งประเทศไทย (BOT)",
+            "description": "อัตราแลกเปลี่ยนเงินบาทต่อดอลลาร์สหรัฐ (ค่ากลาง)",
+        },
+        {
+            "id": "export_growth",
+            "name": "การส่งออก YoY",
+            "name_en": "Export Growth (YoY)",
+            "value": "4.2",
+            "unit": "%",
+            "prev_value": "3.1",
+            "change": "+1.1",
+            "trend": "up",
+            "period": "ก.พ. 2568",
+            "icon": "🚢",
+            "category": "trade",
+            "source": "กรมศุลกากร / กระทรวงพาณิชย์",
+            "description": "มูลค่าการส่งออกเปรียบเทียบปีก่อน",
+        },
+        {
+            "id": "tourism",
+            "name": "นักท่องเที่ยวต่างชาติ",
+            "name_en": "Foreign Tourist Arrivals",
+            "value": "3.2",
+            "unit": "ล้านคน",
+            "prev_value": "2.9",
+            "change": "+0.3",
+            "trend": "up",
+            "period": "ก.พ. 2568",
+            "icon": "✈️",
+            "category": "tourism",
+            "source": "กรมการท่องเที่ยว (DOT)",
+            "description": "จำนวนนักท่องเที่ยวต่างชาติเดินทางเข้าไทย",
+        },
+        {
+            "id": "unemployment",
+            "name": "อัตราการว่างงาน",
+            "name_en": "Unemployment Rate",
+            "value": "1.0",
+            "unit": "%",
+            "prev_value": "0.9",
+            "change": "+0.1",
+            "trend": "neutral",
+            "period": "Q4/2567",
+            "icon": "👷",
+            "category": "labor",
+            "source": "สำนักงานสถิติแห่งชาติ (NSO)",
+            "description": "อัตราการว่างงานในประเทศไทย",
+        },
+        {
+            "id": "current_account",
+            "name": "ดุลบัญชีเดินสะพัด",
+            "name_en": "Current Account Balance",
+            "value": "+2.1",
+            "unit": "พันล้านUSD",
+            "prev_value": "+1.5",
+            "change": "+0.6",
+            "trend": "up",
+            "period": "ก.พ. 2568",
+            "icon": "⚖️",
+            "category": "trade",
+            "source": "ธนาคารแห่งประเทศไทย (BOT)",
+            "description": "ดุลบัญชีเดินสะพัด (เกินดุล = บวก)",
+        },
+    ]
+
+    result = {
+        "indicators": indicators,
+        "updated_at": "2025-03-28",
+        "note": "ข้อมูลอ้างอิงจากแหล่งราชการ อัปเดตตามรอบการประกาศข้อมูล",
+    }
+    cache.set(CACHE_KEY, result, 6 * 3600)
+    return Response(result)

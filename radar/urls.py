@@ -41,6 +41,7 @@ urlpatterns = [
     # ── Ticker Tape ──
     path("ticker/",                    views.ticker_tape,           name="ticker"),
     path("calendar/",                  views.economic_calendar_api, name="calendar"),
+    path("thai-indicators/",           views.thai_indicators_api,   name="thai-indicators"),
     path("subscription/",              views.subscription_status,   name="subscription"),
     path("subscription/plans/",        views.subscription_plans,    name="subscription-plans"),
     # ── GitHub Actions Data Import ──

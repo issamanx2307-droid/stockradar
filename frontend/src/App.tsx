@@ -21,7 +21,6 @@ import EngineBacktest from "./pages/EngineBacktest"
 import Watchlist from "./pages/Watchlist"
 import Subscription from "./pages/Subscription"
 import Fundamental from "./pages/Fundamental"
-import EconomicCalendar from "./pages/EconomicCalendar"
 import AdminPanel from "./pages/AdminPanel"
 import { AutoTermHighlight, TermAssistantProvider, TermAssistantToggle } from "./components/TermAssistant"
 import TickerTape from "./components/TickerTape"
@@ -38,20 +37,19 @@ const USER_NAV: { id: string; label: string; icon: string }[] = [
   { id: "portfolio",    label: "Portfolio",           icon: "💼" },
   { id: "scanner",      label: "สแกนหุ้น",           icon: "🔍" },
   { id: "chart",        label: "กราฟ",               icon: "📈" },
-  { id: "calendar",     label: "ปฏิทินเศรษฐกิจ",    icon: "📅" },
   { id: "strategy",     label: "กลยุทธ์",             icon: "🎯" },
   { id: "backtest",     label: "Backtest",            icon: "⏪" },
   { id: "guide",        label: "คำแนะนำ",            icon: "💡" },
   { id: "qna",          label: "ถาม-ตอบ",            icon: "💬" },
   { id: "subscription", label: "สมาชิก",             icon: "💳" },
-  { id: "profile",      label: "โปรไฟล์",            icon: "👤" },
+  { id: "profile",      label: "โปรไฟล์ / ตั้งค่า",  icon: "⚙️" },
   { id: "contact",      label: "ติดต่อเรา",          icon: "📞" },
 ]
 
 // ── เมนูสำหรับ Superadmin (ควบคุมระบบอย่างเดียว) ────────────────────────────
 const ADMIN_NAV: { id: string; label: string; icon: string }[] = [
-  { id: "admin_panel",  label: "ควบคุมระบบ",        icon: "⚙️" },
-  { id: "profile",      label: "โปรไฟล์",            icon: "👤" },
+  { id: "admin_panel",  label: "ควบคุมระบบ",        icon: "🛠️" },
+  { id: "profile",      label: "โปรไฟล์ / ตั้งค่า",  icon: "⚙️" },
 ]
 
 function AppInner() {
@@ -153,7 +151,6 @@ function AppInner() {
             {page === "portfolio"    && <Portfolio onOpenChart={openChart} />}
             {page === "scanner"      && <Scanner onOpenChart={openChart} onAnalyze={openAnalyze} />}
             {page === "chart"        && <Chart symbol={chartSymbol} />}
-            {page === "calendar"     && <EconomicCalendar />}
             {page === "strategy"     && <StrategyBuilder />}
             {page === "backtest"     && <EngineBacktest onOpenChart={openChart} />}
             {page === "guide"        && <Guide />}
