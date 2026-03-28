@@ -733,12 +733,13 @@ body {
 .qna-main {
   display: flex;
   flex-direction: column;
-  min-height: 520px;
+  height: 560px;
 }
 
 .qna-messages {
   flex: 1;
-  overflow: auto;
+  min-height: 0;
+  overflow-y: auto;
   padding: 12px;
   display: flex;
   flex-direction: column;
@@ -770,6 +771,20 @@ body {
 .qna-msg.user .qna-bubble {
   background: rgba(0, 212, 255, 0.08);
   border-color: rgba(0, 212, 255, 0.22);
+}
+
+.qna-bubble-admin {
+  background: rgba(0, 230, 118, 0.07);
+  border-color: rgba(0, 230, 118, 0.28);
+  border-left: 3px solid #00e676;
+}
+
+.qna-admin-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: #00e676;
+  margin-bottom: 5px;
+  letter-spacing: 0.03em;
 }
 
 .qna-text {
