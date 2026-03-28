@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Symbol, PriceDaily, Indicator, Signal, Profile, BusinessProfile, StockTerm, TermQuestion, PositionAnalysis
+from .models import Symbol, PriceDaily, Indicator, Signal, Profile, BusinessProfile, StockTerm, PositionAnalysis
 from django.contrib.auth.models import User
 
 class BusinessProfileSerializer(serializers.ModelSerializer):
@@ -84,32 +84,6 @@ class StockTermSerializer(serializers.ModelSerializer):
             "priority",
             "updated_at",
         ]
-
-
-class TermQuestionSerializer(serializers.ModelSerializer):
-    asked_by_username = serializers.SerializerMethodField()
-
-    class Meta:
-        model = TermQuestion
-        fields = [
-            "id",
-            "question",
-            "normalized_term",
-            "status",
-            "answer_short",
-            "answer_full",
-            "answered_at",
-            "asked_by_username",
-            "created_at",
-            "updated_at",
-        ]
-
-    def get_asked_by_username(self, obj):
-        return obj.asked_by.username if obj.asked_by else None
-
-
-class TermQuestionCreateSerializer(serializers.Serializer):
-    question = serializers.CharField()
 
 
 class PositionAnalyzeRequestSerializer(serializers.Serializer):

@@ -115,19 +115,6 @@ export interface StockTermInfo {
   updated_at: string;
 }
 
-export interface TermQuestionTicket {
-  id: number;
-  question: string;
-  normalized_term: string;
-  status: "NEW" | "ANSWERED";
-  answer_short: string;
-  answer_full: string;
-  answered_at: string | null;
-  asked_by_username: string | null;
-  created_at: string;
-  updated_at: string;
-}
-
 export interface DashboardResponse {
   stats: DashboardStats;
   latest_signals: SignalInfo[];

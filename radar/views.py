@@ -25,7 +25,6 @@ from .models import (
     Profile,
     BusinessProfile,
     StockTerm,
-    TermQuestion,
     ChatMessage,
 )
 from .serializers import (
@@ -34,8 +33,6 @@ from .serializers import (
     UserSerializer, ProfileSerializer,
     BusinessProfileSerializer,
     StockTermSerializer,
-    TermQuestionSerializer,
-    TermQuestionCreateSerializer,
     PositionAnalyzeRequestSerializer,
 )
 from rest_framework.permissions import IsAuthenticated
@@ -110,85 +107,6 @@ def _extract_candidate_terms(text: str) -> list[str]:
     return out[:10]
 
 
-@api_view(["POST"])
-def qa_ask(request):
-    serializer = TermQuestionCreateSerializer(data=request.data)
-    serializer.is_valid(raise_exception=True)
-    question = serializer.validated_data["question"]
-
-    candidates = _extract_candidate_terms(question)
-    if candidates:
-        found = StockTerm.objects.filter(term__in=candidates).order_by("-is_featured", "-priority").first()
-        if found:
-            return Response({"found": True, "term": StockTermSerializer(found).data})
-
-    q_trim = (question or "").strip()
-    if len(q_trim) >= 3:
-        hit = (StockTerm.objects
-               .filter(models.Q(term__icontains=q_trim) | models.Q(short_definition__icontains=q_trim) | models.Q(full_definition__icontains=q_trim))
-               .order_by("-is_featured", "-priority", "term")
-               .first())
-        if hit:
-            return Response({"found": True, "term": StockTermSerializer(hit).data})
-
-    normalized_term = candidates[0] if candidates else ""
-    asked_by = request.user if getattr(request, "user", None) and request.user.is_authenticated else None
-
-    q_obj = TermQuestion.objects.create(
-        asked_by=asked_by,
-        question=question,
-        normalized_term=normalized_term,
-        status="NEW",
-    )
-
-    return Response({
-        "found": False,
-        "message": "ยังไม่มีคำตอบ ระบบได้ส่งคำถามไปให้ผู้ดูแลเพื่อเพิ่มคำตอบแล้ว",
-        "ticket": TermQuestionSerializer(q_obj).data,
-    }, status=202)
-
-
-@api_view(["GET"])
-@permission_classes([IsAuthenticated])
-def qa_my_questions(request):
-    """คำถามของผู้ใช้ที่ล็อกอินอยู่ (รวมคำตอบจาก admin ถ้ามี)"""
-    qs = TermQuestion.objects.filter(asked_by=request.user).order_by("-created_at")[:50]
-    return Response({"results": TermQuestionSerializer(qs, many=True).data})
-
-
-@api_view(["GET"])
-@permission_classes([IsAuthenticated])
-def qa_pending(request):
-    """รายการคำถามที่รอตอบ — admin only"""
-    if not (request.user.is_staff or request.user.is_superuser):
-        return Response({"error": "Permission denied"}, status=403)
-    qs = TermQuestion.objects.filter(status="NEW").order_by("-created_at")[:100]
-    return Response({"results": TermQuestionSerializer(qs, many=True).data})
-
-
-@api_view(["PATCH"])
-@permission_classes([IsAuthenticated])
-def qa_answer(request, question_id):
-    """admin ตอบคำถาม"""
-    if not (request.user.is_staff or request.user.is_superuser):
-        return Response({"error": "Permission denied"}, status=403)
-    try:
-        q_obj = TermQuestion.objects.get(id=question_id)
-    except TermQuestion.DoesNotExist:
-        return Response({"error": "ไม่พบคำถาม"}, status=404)
-
-    answer_short = request.data.get("answer_short", "").strip()
-    answer_full = request.data.get("answer_full", "").strip()
-    if not answer_short:
-        return Response({"error": "กรุณาใส่คำตอบ"}, status=400)
-
-    q_obj.answer_short = answer_short
-    q_obj.answer_full = answer_full
-    q_obj.status = "ANSWERED"
-    q_obj.answered_by = request.user
-    q_obj.answered_at = timezone.now()
-    q_obj.save()
-    return Response({"ok": True, "ticket": TermQuestionSerializer(q_obj).data})
 
 
 @api_view(["POST"])
@@ -1695,46 +1613,6 @@ def admin_refresh_snapshot(request):
         return Response({"status": "ok", "message": "Refresh snapshot สำเร็จ"})
     except Exception as e:
         return Response({"status": "error", "message": str(e)}, status=500)
-
-
-@api_view(["GET"])
-@permission_classes([IsAuthenticated])
-def admin_users_list(request):
-    """GET /api/admin/users/ — รายชื่อ user ทั้งหมดพร้อม portfolio flag"""
-    if not (request.user.is_staff or request.user.is_superuser):
-        return Response({"error": "Permission denied"}, status=403)
-    from django.contrib.auth.models import User as AuthUser
-    users = AuthUser.objects.select_related("profile").all().order_by("-date_joined")
-    data = []
-    for u in users:
-        profile = getattr(u, "profile", None)
-        data.append({
-            "id": u.id,
-            "username": u.username,
-            "email": u.email,
-            "tier": getattr(profile, "tier", "FREE"),
-            "can_use_portfolio": getattr(profile, "can_use_portfolio", False),
-            "date_joined": u.date_joined.strftime("%d/%m/%Y"),
-        })
-    return Response({"results": data, "count": len(data)})
-
-
-@api_view(["PATCH"])
-@permission_classes([IsAuthenticated])
-def admin_toggle_portfolio(request, user_id):
-    """PATCH /api/admin/users/<id>/portfolio/ — เปิด/ปิด portfolio flag"""
-    if not (request.user.is_staff or request.user.is_superuser):
-        return Response({"error": "Permission denied"}, status=403)
-    from django.contrib.auth.models import User as AuthUser
-    try:
-        target = AuthUser.objects.select_related("profile").get(id=user_id)
-    except AuthUser.DoesNotExist:
-        return Response({"error": "ไม่พบ user"}, status=404)
-    profile = target.profile
-    enabled = bool(request.data.get("can_use_portfolio", False))
-    profile.can_use_portfolio = enabled
-    profile.save(update_fields=["can_use_portfolio"])
-    return Response({"user_id": user_id, "username": target.username, "can_use_portfolio": enabled})
 
 
 # ─── Thai Economic Indicators API ─────────────────────────────────────────────

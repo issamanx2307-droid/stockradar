@@ -9,7 +9,6 @@ import {
   UserInfo,
   BusinessProfileInfo,
   StockTermInfo,
-  TermQuestionTicket,
   ChatMessageInfo,
   ChatConversation,
 } from "./types"
@@ -50,20 +49,6 @@ export const api = {
     apiFetch("/terms/search/?" + new URLSearchParams({ q })),
   getFeaturedTerms: (): Promise<{ results: StockTermInfo[] }> =>
     apiFetch("/terms/featured/"),
-  askQuestion: (question: string): Promise<{ found: boolean; term?: StockTermInfo; message?: string; ticket?: TermQuestionTicket }> =>
-    apiFetch("/qa/ask/", {
-      method: "POST",
-      body: JSON.stringify({ question }),
-    }),
-  getMyQuestions: (): Promise<{ results: TermQuestionTicket[] }> =>
-    apiFetch("/qa/my-questions/"),
-  getPendingQuestions: (): Promise<{ results: TermQuestionTicket[] }> =>
-    apiFetch("/qa/pending/"),
-  answerQuestion: (id: number, answer_short: string, answer_full: string): Promise<{ ok: boolean; ticket: TermQuestionTicket }> =>
-    apiFetch(`/qa/answer/${id}/`, {
-      method: "PATCH",
-      body: JSON.stringify({ answer_short, answer_full }),
-    }),
   updateProfile: (data: Partial<UserInfo["profile"]>): Promise<UserInfo> =>
     apiFetch("/profile/", {
       method: "PUT",

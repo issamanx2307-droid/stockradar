@@ -12,10 +12,6 @@ urlpatterns = [
     path("term/",                    views.term_lookup,                  name="term-lookup"),
     path("terms/search/",            views.term_search,                  name="term-search"),
     path("terms/featured/",          views.featured_terms,               name="term-featured"),
-    path("qa/ask/",                  views.qa_ask,                       name="qa-ask"),
-    path("qa/my-questions/",         views.qa_my_questions,              name="qa-my-questions"),
-    path("qa/pending/",              views.qa_pending,                   name="qa-pending"),
-    path("qa/answer/<int:question_id>/", views.qa_answer,                name="qa-answer"),
     path("position/analyze/",        views.position_analyze_api,         name="position-analyze"),
     path("symbols/",                 views.SymbolListView.as_view(),      name="symbol-list"),
     path("prices/<str:symbol>/",     views.PriceListView.as_view(),       name="price-list"),
@@ -58,8 +54,6 @@ urlpatterns = [
     path("admin/stats/",               views.admin_stats,            name="admin-stats"),
     path("admin/fetch-news/",          views.admin_fetch_news,       name="admin-fetch-news"),
     path("admin/refresh-snapshot/",    views.admin_refresh_snapshot, name="admin-refresh-snapshot"),
-    path("admin/users/",                         views.admin_users_list,       name="admin-users"),
-    path("admin/users/<int:user_id>/portfolio/", views.admin_toggle_portfolio, name="admin-toggle-portfolio"),
     # ── VI Screener ──
     path("vi-screen/",                 views.vi_screen_api,          name="vi-screen"),
     # ── Chat System ──
