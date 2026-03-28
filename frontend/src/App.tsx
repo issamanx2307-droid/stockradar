@@ -12,7 +12,6 @@ import StrategyBuilder from "./pages/StrategyBuilder"
 import Profile from "./pages/Profile"
 import Contact from "./pages/Contact"
 import Guide from "./pages/Guide"
-import Qna from "./pages/Qna"
 import News from "./pages/News"
 import Analyze from "./pages/Analyze"
 import EngineScan from "./pages/EngineScan"
@@ -39,8 +38,7 @@ const USER_NAV: { id: string; label: string; icon: string }[] = [
   { id: "chart",        label: "กราฟ",               icon: "📈" },
   { id: "strategy",     label: "กลยุทธ์",             icon: "🎯" },
   { id: "backtest",     label: "Backtest",            icon: "⏪" },
-  { id: "guide",        label: "คำแนะนำ",            icon: "💡" },
-  { id: "qna",          label: "ถาม-ตอบ",            icon: "💬" },
+  { id: "guide",        label: "คำแนะนำ & ถาม-ตอบ",  icon: "💡" },
   { id: "subscription", label: "สมาชิก",             icon: "💳" },
   { id: "profile",      label: "โปรไฟล์ / ตั้งค่า",  icon: "⚙️" },
   { id: "contact",      label: "ติดต่อเรา",          icon: "📞" },
@@ -154,7 +152,6 @@ function AppInner() {
             {page === "strategy"     && <StrategyBuilder />}
             {page === "backtest"     && <EngineBacktest onOpenChart={openChart} />}
             {page === "guide"        && <Guide />}
-            {page === "qna"          && <Qna />}
             {page === "subscription" && <Subscription />}
             {page === "profile"      && <Profile />}
             {page === "contact"      && <Contact />}
