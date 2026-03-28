@@ -6,11 +6,13 @@ Celery Tasks สำหรับ Radar หุ้น
 """
 
 import logging
+import time
 from datetime import date, timedelta
 from decimal import Decimal
 
 from celery import shared_task
 from django.db import transaction
+from django.utils import timezone
 
 logger = logging.getLogger(__name__)
 
@@ -277,3 +279,194 @@ def _bulk_upsert_prices(sym_obj, rows: list[dict]):
             PriceDaily.objects.bulk_create(to_create, batch_size=500)
         if to_update:
             PriceDaily.objects.bulk_update(to_update, ["open", "high", "low", "close", "volume"], batch_size=500)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# VI Screener: fetch fundamentals + compute VI score
+# รัน 1 ครั้ง/วัน  โหลด 50 หุ้น/ครั้ง (rolling 3 วัน = ~150 บริษัทใน SET)
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _safe_float(val) -> float | None:
+    """แปลง yfinance value เป็น float ปลอดภัย (None / inf → None)"""
+    try:
+        v = float(val)
+        return None if (v != v or abs(v) == float("inf")) else v
+    except (TypeError, ValueError):
+        return None
+
+
+def compute_vi_score(snap) -> tuple[float, str]:
+    """
+    คำนวณ VI Score 0–100 จาก FundamentalSnapshot instance
+
+    คะแนน:
+      P/E       25 pt   ≤10→25, ≤15→20, ≤20→15, ≤25→8, >25→0
+      P/B       20 pt   ≤1→20,  ≤2→15,  ≤3→8,   >3→0
+      ROE       20 pt   ≥20→20, ≥15→15, ≥10→8,  <10→0
+      DivYield  15 pt   ≥5→15,  ≥3→10,  ≥1→5,   <1→0
+      D/E       10 pt   ≤0.5→10,≤1→7,  ≤2→3,   >2→0
+      RevGrowth 10 pt   ≥20→10, ≥10→7,  ≥0→4,   <0→0
+
+    Grade: A≥80 / B≥60 / C≥40 / D<40
+    """
+    score = 0.0
+
+    # P/E
+    pe = _safe_float(snap.pe_ratio)
+    if pe is not None and pe > 0:
+        if pe <= 10:   score += 25
+        elif pe <= 15: score += 20
+        elif pe <= 20: score += 15
+        elif pe <= 25: score += 8
+
+    # P/B
+    pb = _safe_float(snap.pb_ratio)
+    if pb is not None and pb > 0:
+        if pb <= 1:   score += 20
+        elif pb <= 2: score += 15
+        elif pb <= 3: score += 8
+
+    # ROE
+    roe = _safe_float(snap.roe)
+    if roe is not None:
+        if roe >= 20:   score += 20
+        elif roe >= 15: score += 15
+        elif roe >= 10: score += 8
+
+    # Dividend Yield
+    dy = _safe_float(snap.dividend_yield)
+    if dy is not None and dy >= 0:
+        if dy >= 5:   score += 15
+        elif dy >= 3: score += 10
+        elif dy >= 1: score += 5
+
+    # D/E
+    de = _safe_float(snap.debt_to_equity)
+    if de is not None and de >= 0:
+        if de <= 0.5: score += 10
+        elif de <= 1: score += 7
+        elif de <= 2: score += 3
+
+    # Revenue Growth
+    rg = _safe_float(snap.revenue_growth)
+    if rg is not None:
+        if rg >= 20:  score += 10
+        elif rg >= 10: score += 7
+        elif rg >= 0:  score += 4
+
+    grade = "A" if score >= 80 else "B" if score >= 60 else "C" if score >= 40 else "D"
+    return round(score, 2), grade
+
+
+@shared_task(name="radar.fetch_set_fundamentals")
+def fetch_set_fundamentals():
+    """
+    ดึงข้อมูล fundamental จาก Yahoo Finance สำหรับ SET
+    - คัด top 150 หุ้นตาม volume_avg20 จาก LatestSnapshot
+    - แบ่ง batch 50 หุ้น/วัน (rotating โดยใช้ day-of-year % 3)
+    - skip ถ้า fetched_at < 7 วัน (cache)
+    """
+    try:
+        import yfinance as yf
+    except ImportError:
+        logger.error("yfinance not installed")
+        return
+
+    from .models import Symbol, LatestSnapshot, FundamentalSnapshot
+
+    # top 150 SET หุ้นตาม volume
+    top_symbols = (
+        LatestSnapshot.objects
+        .filter(exchange="SET", volume_avg20__isnull=False, volume_avg20__gte=1_000_000)
+        .order_by("-volume_avg20")
+        .values_list("symbol", flat=True)[:150]
+    )
+    symbol_list = list(top_symbols)
+    if not symbol_list:
+        logger.warning("fetch_set_fundamentals: no symbols found")
+        return
+
+    # rotating batch: วันนี้ใช้ offset ไหน
+    day_offset = timezone.now().toordinal() % 3
+    batch = symbol_list[day_offset * 50 : day_offset * 50 + 50]
+
+    stale_cutoff = timezone.now() - timedelta(days=7)
+    updated = skipped = errors = 0
+
+    for sym_code in batch:
+        # skip ถ้ายังไม่ stale
+        try:
+            existing = FundamentalSnapshot.objects.get(symbol__symbol=sym_code)
+            if existing.fetched_at >= stale_cutoff:
+                skipped += 1
+                continue
+        except FundamentalSnapshot.DoesNotExist:
+            existing = None
+
+        ticker_code = f"{sym_code}.BK"
+        try:
+            info = yf.Ticker(ticker_code).info
+
+            pe  = _safe_float(info.get("trailingPE") or info.get("forwardPE"))
+            pb  = _safe_float(info.get("priceToBook"))
+            roe = _safe_float(info.get("returnOnEquity"))
+            if roe is not None: roe *= 100          # yfinance → ratio → %
+            roa = _safe_float(info.get("returnOnAssets"))
+            if roa is not None: roa *= 100
+            nm  = _safe_float(info.get("profitMargins"))
+            if nm is not None: nm *= 100
+            rg  = _safe_float(info.get("revenueGrowth"))
+            if rg is not None: rg *= 100
+            eg  = _safe_float(info.get("earningsGrowth"))
+            if eg is not None: eg *= 100
+            de  = _safe_float(info.get("debtToEquity"))
+            cr  = _safe_float(info.get("currentRatio"))
+            dy  = _safe_float(info.get("dividendYield"))
+            if dy is not None: dy *= 100
+            mc  = info.get("marketCap")
+            mc  = int(mc) if mc else None
+
+            # pre-filter: skip rubbish data
+            net_income = info.get("netIncomeToCommon")
+            if net_income is not None and float(net_income) < 0:
+                logger.info("skip %s: negative net income", sym_code)
+                skipped += 1
+                time.sleep(1)
+                continue
+            if pb is not None and pb < 0:
+                logger.info("skip %s: negative book value", sym_code)
+                skipped += 1
+                time.sleep(1)
+                continue
+
+            sym_obj = Symbol.objects.get(symbol=sym_code)
+            snap, _ = FundamentalSnapshot.objects.get_or_create(symbol=sym_obj)
+            snap.pe_ratio       = pe
+            snap.pb_ratio       = pb
+            snap.market_cap     = mc
+            snap.roe            = roe
+            snap.roa            = roa
+            snap.net_margin     = nm
+            snap.revenue_growth = rg
+            snap.earnings_growth = eg
+            snap.debt_to_equity = de
+            snap.current_ratio  = cr
+            snap.dividend_yield = dy
+
+            vi_score, vi_grade = compute_vi_score(snap)
+            snap.vi_score = vi_score
+            snap.vi_grade = vi_grade
+            snap.save()
+            updated += 1
+
+        except Exception as e:
+            logger.warning("fetch_set_fundamentals error %s: %s", sym_code, e)
+            errors += 1
+
+        time.sleep(1.5)   # ป้องกัน rate limit
+
+    logger.info(
+        "fetch_set_fundamentals done: updated=%d skipped=%d errors=%d",
+        updated, skipped, errors
+    )
+    return {"updated": updated, "skipped": skipped, "errors": errors}

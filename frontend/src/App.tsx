@@ -19,6 +19,7 @@ import Portfolio from "./pages/Portfolio"
 import EngineBacktest from "./pages/EngineBacktest"
 import Watchlist from "./pages/Watchlist"
 import Fundamental from "./pages/Fundamental"
+import VIScreen from "./pages/VIScreen"
 import AdminPanel from "./pages/AdminPanel"
 import { AutoTermHighlight, TermAssistantProvider, TermAssistantToggle } from "./components/TermAssistant"
 import TickerTape from "./components/TickerTape"
@@ -32,6 +33,7 @@ const USER_NAV: { id: string; label: string; icon: string }[] = [
   { id: "news",         label: "ข่าว & Sentiment",   icon: "📰" },
   { id: "analyze",      label: "วิเคราะห์หุ้น",     icon: "🔬" },
   { id: "fundamental",  label: "Fundamental",         icon: "📊" },
+  { id: "vi_screen",    label: "หุ้นดีราคาต่ำ",       icon: "💎" },
   { id: "portfolio",    label: "Portfolio",           icon: "💼" },
   { id: "scanner",      label: "สแกนหุ้น",           icon: "🔍" },
   { id: "chart",        label: "กราฟ",               icon: "📈" },
@@ -144,6 +146,7 @@ function AppInner() {
             {page === "news"         && <News onOpenChart={openChart} />}
             {page === "analyze"      && <Analyze onOpenChart={openChart} initialSymbol={analyzeSymbol} />}
             {page === "fundamental"  && <Fundamental onOpenChart={openChart} />}
+            {page === "vi_screen"    && <VIScreen onOpenChart={openChart} />}
             {page === "portfolio"    && <Portfolio onOpenChart={openChart} />}
             {page === "scanner"      && <Scanner onOpenChart={openChart} onAnalyze={openAnalyze} />}
             {page === "chart"        && <Chart symbol={chartSymbol} />}

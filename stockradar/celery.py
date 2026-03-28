@@ -41,4 +41,9 @@ app.conf.beat_schedule = {
         "task": "radar.tasks.refresh_latest_snapshot",
         "schedule": crontab(hour=19, minute=15, day_of_week="1-5"),
     },
+    # ดึง Fundamental data สำหรับ VI Screener (20:00 น. ทุกวัน)
+    "fetch-vi-fundamentals-รายวัน": {
+        "task": "radar.fetch_set_fundamentals",
+        "schedule": crontab(hour=20, minute=0),
+    },
 }

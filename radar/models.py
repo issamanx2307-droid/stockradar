@@ -783,3 +783,41 @@ class LatestSnapshot(models.Model):
 
     def __str__(self):
         return f"{self.symbol} | {self.close} | {self.direction} {self.signal_score}"
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# FundamentalSnapshot — VI Screener (หุ้นดีราคาต่ำ)
+# ดึงจาก Yahoo Finance (.BK) วันละ 50 บริษัท / cache 7 วัน
+# ─────────────────────────────────────────────────────────────────────────────
+
+class FundamentalSnapshot(models.Model):
+    symbol          = models.OneToOneField(Symbol, on_delete=models.CASCADE,
+                                           related_name="fundamental_snapshot")
+    # ── Valuation ────────────────────────────────────────────────────────────
+    pe_ratio        = models.DecimalField(max_digits=10, decimal_places=2, null=True)
+    pb_ratio        = models.DecimalField(max_digits=10, decimal_places=2, null=True)
+    market_cap      = models.BigIntegerField(null=True)            # THB
+    # ── Profitability ────────────────────────────────────────────────────────
+    roe             = models.DecimalField(max_digits=8,  decimal_places=2, null=True)   # %
+    roa             = models.DecimalField(max_digits=8,  decimal_places=2, null=True)   # %
+    net_margin      = models.DecimalField(max_digits=8,  decimal_places=2, null=True)   # %
+    # ── Growth ───────────────────────────────────────────────────────────────
+    revenue_growth  = models.DecimalField(max_digits=8,  decimal_places=2, null=True)   # % YoY
+    earnings_growth = models.DecimalField(max_digits=8,  decimal_places=2, null=True)   # % YoY
+    # ── Health ───────────────────────────────────────────────────────────────
+    debt_to_equity  = models.DecimalField(max_digits=10, decimal_places=2, null=True)
+    current_ratio   = models.DecimalField(max_digits=8,  decimal_places=2, null=True)
+    # ── Dividend ─────────────────────────────────────────────────────────────
+    dividend_yield  = models.DecimalField(max_digits=8,  decimal_places=2, null=True)   # %
+    # ── VI Score ─────────────────────────────────────────────────────────────
+    vi_score        = models.DecimalField(max_digits=6,  decimal_places=2, null=True)
+    vi_grade        = models.CharField(max_length=2, null=True)    # A/B/C/D
+    # ── Meta ─────────────────────────────────────────────────────────────────
+    fetched_at      = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name        = "Fundamental Snapshot"
+        verbose_name_plural = "Fundamental Snapshots"
+
+    def __str__(self):
+        return f"{self.symbol} | VI={self.vi_score} ({self.vi_grade})"

@@ -1797,3 +1797,123 @@ def thai_indicators_api(request):
     }
     cache.set(CACHE_KEY, result, 6 * 3600)
     return Response(result)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# VI Screener — หุ้นดีราคาต่ำ
+# ─────────────────────────────────────────────────────────────────────────────
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def vi_screen_api(request):
+    """
+    GET /api/vi-screen/
+    Query params:
+      grade        = A|B|C|D  (default: all)
+      min_score    = number   (default: 0)
+      max_pe       = number
+      max_pb       = number
+      min_roe      = number
+      min_div      = number   (min dividend yield %)
+      sort         = vi_score|pe_ratio|pb_ratio|roe|dividend_yield (default: vi_score)
+      page_size    = number   (default: 50, max 200)
+    """
+    from .models import FundamentalSnapshot
+    from .tasks import fetch_set_fundamentals
+
+    # ── trigger background fetch if DB is empty ──────────────────────────────
+    total = FundamentalSnapshot.objects.count()
+    if total == 0:
+        fetch_set_fundamentals.delay()
+
+    # ── filters ──────────────────────────────────────────────────────────────
+    qs = FundamentalSnapshot.objects.select_related("symbol").filter(
+        vi_score__isnull=False
+    )
+
+    grade = request.query_params.get("grade", "")
+    if grade in ("A", "B", "C", "D"):
+        qs = qs.filter(vi_grade=grade)
+
+    min_score = request.query_params.get("min_score", "")
+    if min_score:
+        try: qs = qs.filter(vi_score__gte=float(min_score))
+        except ValueError: pass
+
+    max_pe = request.query_params.get("max_pe", "")
+    if max_pe:
+        try: qs = qs.filter(pe_ratio__lte=float(max_pe), pe_ratio__gt=0)
+        except ValueError: pass
+
+    max_pb = request.query_params.get("max_pb", "")
+    if max_pb:
+        try: qs = qs.filter(pb_ratio__lte=float(max_pb), pb_ratio__gt=0)
+        except ValueError: pass
+
+    min_roe = request.query_params.get("min_roe", "")
+    if min_roe:
+        try: qs = qs.filter(roe__gte=float(min_roe))
+        except ValueError: pass
+
+    min_div = request.query_params.get("min_div", "")
+    if min_div:
+        try: qs = qs.filter(dividend_yield__gte=float(min_div))
+        except ValueError: pass
+
+    # ── sort ─────────────────────────────────────────────────────────────────
+    SORT_MAP = {
+        "vi_score":      "-vi_score",
+        "pe_ratio":       "pe_ratio",
+        "pb_ratio":       "pb_ratio",
+        "roe":           "-roe",
+        "dividend_yield":"-dividend_yield",
+    }
+    sort_param = request.query_params.get("sort", "vi_score")
+    qs = qs.order_by(SORT_MAP.get(sort_param, "-vi_score"))
+
+    try:
+        page_size = min(int(request.query_params.get("page_size", 50)), 200)
+    except ValueError:
+        page_size = 50
+
+    qs = qs[:page_size]
+
+    results = []
+    for snap in qs:
+        sym = snap.symbol
+        results.append({
+            "symbol":         sym.symbol,
+            "name":           sym.name,
+            "exchange":       sym.exchange,
+            "sector":         getattr(sym, "sector", None),
+            "vi_score":       float(snap.vi_score) if snap.vi_score is not None else None,
+            "vi_grade":       snap.vi_grade,
+            "pe_ratio":       float(snap.pe_ratio)       if snap.pe_ratio       is not None else None,
+            "pb_ratio":       float(snap.pb_ratio)       if snap.pb_ratio       is not None else None,
+            "roe":            float(snap.roe)            if snap.roe            is not None else None,
+            "roa":            float(snap.roa)            if snap.roa            is not None else None,
+            "net_margin":     float(snap.net_margin)     if snap.net_margin     is not None else None,
+            "revenue_growth": float(snap.revenue_growth) if snap.revenue_growth is not None else None,
+            "debt_to_equity": float(snap.debt_to_equity) if snap.debt_to_equity is not None else None,
+            "current_ratio":  float(snap.current_ratio)  if snap.current_ratio  is not None else None,
+            "dividend_yield": float(snap.dividend_yield) if snap.dividend_yield is not None else None,
+            "market_cap":     snap.market_cap,
+            "fetched_at":     snap.fetched_at.isoformat() if snap.fetched_at else None,
+        })
+
+    # grade summary counts
+    from django.db.models import Count
+    grade_counts = dict(
+        FundamentalSnapshot.objects
+        .filter(vi_grade__isnull=False)
+        .values("vi_grade")
+        .annotate(n=Count("id"))
+        .values_list("vi_grade", "n")
+    )
+
+    return Response({
+        "count":        total,
+        "grade_counts": grade_counts,
+        "results":      results,
+        "fetching":     total == 0,
+    })
