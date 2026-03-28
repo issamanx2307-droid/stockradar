@@ -21,6 +21,8 @@ import Watchlist from "./pages/Watchlist"
 import Fundamental from "./pages/Fundamental"
 import VIScreen from "./pages/VIScreen"
 import AdminPanel from "./pages/AdminPanel"
+import AdminChat from "./pages/AdminChat"
+import Chat from "./pages/Chat"
 import { AutoTermHighlight, TermAssistantProvider, TermAssistantToggle } from "./components/TermAssistant"
 import TickerTape from "./components/TickerTape"
 import "./App.css"
@@ -42,11 +44,13 @@ const USER_NAV: { id: string; label: string; icon: string }[] = [
   { id: "guide",        label: "คำแนะนำ & ถาม-ตอบ",  icon: "💡" },
   { id: "profile",      label: "บัญชี & สมาชิก",     icon: "⚙️" },
   { id: "contact",      label: "ติดต่อเรา",          icon: "📞" },
+  { id: "chat",         label: "ข้อความ",             icon: "💬" },
 ]
 
 // ── เมนูสำหรับ Superadmin (ควบคุมระบบอย่างเดียว) ────────────────────────────
 const ADMIN_NAV: { id: string; label: string; icon: string }[] = [
   { id: "admin_panel",  label: "ควบคุมระบบ",        icon: "🛠️" },
+  { id: "admin_chat",   label: "กล่องข้อความ",       icon: "💬" },
   { id: "profile",      label: "โปรไฟล์ / ตั้งค่า",  icon: "⚙️" },
 ]
 
@@ -59,7 +63,7 @@ function AppInner() {
   const VALID_PAGES = [
     "dashboard","engine_scan","watchlist","news","analyze","fundamental",
     "vi_screen","scanner","chart","strategy","backtest",
-    "guide","profile","contact","subscription","admin_panel",
+    "guide","profile","contact","subscription","admin_panel","admin_chat","chat",
   ]
   function getHashPage(fallback: string) {
     const h = window.location.hash.replace("#", "")
@@ -70,7 +74,29 @@ function AppInner() {
   const [history, setHistory] = useState<string[]>([])
   const [chartSymbol, setChartSymbol]     = useState<string | null>(null)
   const [analyzeSymbol, setAnalyzeSymbol] = useState<string | null>(null)
+  const [chatUnread, setChatUnread]       = useState(0)
   const ws = useRadarWS()
+
+  // ── Poll unread chat count ────────────────────────────────────────────────
+  useEffect(() => {
+    if (!user) return
+    async function pollUnread() {
+      try {
+        if (isAdmin) {
+          const res = await (await import("./api/client")).api.chatConversations()
+          const total = res.conversations.reduce((s: number, c: any) => s + c.unread, 0)
+          setChatUnread(total)
+        } else {
+          const res = await (await import("./api/client")).api.chatMessages()
+          const unread = res.messages.filter((m: any) => !m.is_mine && !m.is_read).length
+          setChatUnread(unread)
+        }
+      } catch {/* silent */}
+    }
+    pollUnread()
+    const iv = setInterval(pollUnread, 15000)
+    return () => clearInterval(iv)
+  }, [user, isAdmin])
 
   // sync hash → state (browser back/forward)
   useEffect(() => {
@@ -154,7 +180,19 @@ function AppInner() {
               <button key={item.id}
                 className={`nav-btn ${page === item.id ? "active" : ""}`}
                 onClick={() => navigateTo(item.id)}>
-                <span className="nav-icon">{item.icon}</span>
+                <span className="nav-icon" style={{ position: "relative" }}>
+                  {item.icon}
+                  {(item.id === "chat" || item.id === "admin_chat") && chatUnread > 0 && (
+                    <span style={{
+                      position: "absolute", top: -4, right: -6,
+                      background: "#f44336", color: "#fff",
+                      fontSize: 9, fontWeight: 800,
+                      borderRadius: 10, padding: "0 4px",
+                      minWidth: 14, textAlign: "center",
+                      lineHeight: "14px",
+                    }}>{chatUnread > 9 ? "9+" : chatUnread}</span>
+                  )}
+                </span>
                 <span className="nav-label">{item.label}</span>
               </button>
             ))}
@@ -216,6 +254,8 @@ function AppInner() {
             {page === "guide"        && <Guide />}
             {page === "profile"      && <Profile />}
             {page === "contact"      && <Contact />}
+            {page === "chat"         && !isAdmin && <Chat onRead={() => setChatUnread(0)} />}
+            {page === "admin_chat"   && isAdmin  && <AdminChat />}
           </AutoTermHighlight>
         </main>
       </div>

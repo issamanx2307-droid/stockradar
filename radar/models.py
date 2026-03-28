@@ -822,3 +822,32 @@ class FundamentalSnapshot(models.Model):
 
     def __str__(self):
         return f"{self.symbol} | VI={self.vi_score} ({self.vi_grade})"
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Chat System (Admin ↔ User)
+# ─────────────────────────────────────────────────────────────────────────────
+
+class ChatMessage(models.Model):
+    sender   = models.ForeignKey(User, on_delete=models.CASCADE,
+                                 related_name="sent_chat_msgs",
+                                 verbose_name="ผู้ส่ง")
+    receiver = models.ForeignKey(User, on_delete=models.CASCADE,
+                                 related_name="recv_chat_msgs",
+                                 verbose_name="ผู้รับ")
+    body     = models.TextField(verbose_name="ข้อความ")
+    is_read  = models.BooleanField(default=False, db_index=True,
+                                   verbose_name="อ่านแล้ว")
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    class Meta:
+        ordering            = ["created_at"]
+        verbose_name        = "ข้อความแชท"
+        verbose_name_plural = "ข้อความแชท"
+        indexes = [
+            models.Index(fields=["sender", "receiver", "created_at"],
+                         name="idx_chat_convo"),
+        ]
+
+    def __str__(self):
+        return f"{self.sender.username} → {self.receiver.username}: {self.body[:40]}"

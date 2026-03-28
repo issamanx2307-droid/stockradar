@@ -62,4 +62,8 @@ urlpatterns = [
     path("admin/users/<int:user_id>/portfolio/", views.admin_toggle_portfolio, name="admin-toggle-portfolio"),
     # ── VI Screener ──
     path("vi-screen/",                 views.vi_screen_api,          name="vi-screen"),
+    # ── Chat System ──
+    path("chat/send/",                 views.chat_send,              name="chat-send"),
+    path("chat/messages/",             views.chat_messages,          name="chat-messages"),
+    path("chat/conversations/",        views.chat_conversations,     name="chat-conversations"),
 ]

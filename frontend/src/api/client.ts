@@ -10,6 +10,8 @@ import {
   BusinessProfileInfo,
   StockTermInfo,
   TermQuestionTicket,
+  ChatMessageInfo,
+  ChatConversation,
 } from "./types"
 
 const BASE_URL = API_BASE
@@ -97,4 +99,15 @@ export const api = {
       method: "POST",
       body: JSON.stringify(body),
     }),
+
+  // ── Chat ──────────────────────────────────────────────────────────────────
+  chatSend: (body: string, receiver_id?: number): Promise<ChatMessageInfo> =>
+    apiFetch("/chat/send/", {
+      method: "POST",
+      body: JSON.stringify({ body, ...(receiver_id ? { receiver_id } : {}) }),
+    }),
+  chatMessages: (user_id?: number): Promise<{ messages: ChatMessageInfo[] }> =>
+    apiFetch("/chat/messages/" + (user_id ? `?user_id=${user_id}` : "")),
+  chatConversations: (): Promise<{ conversations: ChatConversation[] }> =>
+    apiFetch("/chat/conversations/"),
 }

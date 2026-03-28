@@ -26,6 +26,7 @@ from .models import (
     BusinessProfile,
     StockTerm,
     TermQuestion,
+    ChatMessage,
 )
 from .serializers import (
     SymbolSerializer, PriceDailySerializer,
@@ -2004,3 +2005,169 @@ def vi_screen_api(request):
         "results":      results,
         "fetching":     total == 0,
     })
+
+
+# ─── Chat System (Admin ↔ User) ───────────────────────────────────────────────
+
+def _get_admin_user():
+    """คืน superuser คนแรก (ผู้ดูแลระบบ)"""
+    from django.contrib.auth.models import User as AuthUser
+    return AuthUser.objects.filter(is_superuser=True).order_by("id").first()
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def chat_send(request):
+    """
+    POST /api/chat/send/
+    Body: { body: str, receiver_id?: int }
+    - User ธรรมดา: ส่งหาแอดมิน (receiver_id ไม่จำเป็น)
+    - Admin: ต้องระบุ receiver_id
+    """
+    from django.contrib.auth.models import User as AuthUser
+    body = (request.data.get("body") or "").strip()
+    if not body:
+        return Response({"error": "กรุณาพิมพ์ข้อความ"}, status=400)
+
+    is_admin = request.user.is_staff or request.user.is_superuser
+
+    if is_admin:
+        receiver_id = request.data.get("receiver_id")
+        if not receiver_id:
+            return Response({"error": "ต้องระบุ receiver_id"}, status=400)
+        try:
+            receiver = AuthUser.objects.get(pk=receiver_id)
+        except AuthUser.DoesNotExist:
+            return Response({"error": "ไม่พบผู้ใช้"}, status=404)
+    else:
+        receiver = _get_admin_user()
+        if not receiver:
+            return Response({"error": "ไม่พบแอดมิน"}, status=503)
+
+    msg = ChatMessage.objects.create(sender=request.user, receiver=receiver, body=body)
+    return Response({
+        "id":         msg.id,
+        "body":       msg.body,
+        "sender_id":  msg.sender_id,
+        "sender":     msg.sender.username,
+        "is_admin_msg": is_admin,
+        "created_at": msg.created_at.isoformat(),
+    }, status=201)
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def chat_messages(request):
+    """
+    GET /api/chat/messages/?user_id=<id>
+    - User: ดึงบทสนทนากับแอดมิน (ทั้งส่งและรับ)
+    - Admin: ดึงบทสนทนากับ user ที่ระบุ (user_id required)
+    ส่งคืนพร้อม mark messages ว่า read
+    """
+    from django.contrib.auth.models import User as AuthUser
+    from django.db.models import Q
+
+    is_admin = request.user.is_staff or request.user.is_superuser
+
+    if is_admin:
+        user_id = request.query_params.get("user_id")
+        if not user_id:
+            return Response({"error": "ต้องระบุ user_id"}, status=400)
+        try:
+            other_user = AuthUser.objects.get(pk=user_id)
+        except AuthUser.DoesNotExist:
+            return Response({"error": "ไม่พบผู้ใช้"}, status=404)
+        admin_user = request.user
+    else:
+        other_user = _get_admin_user()
+        admin_user = other_user
+        if not other_user:
+            return Response({"messages": []})
+
+    msgs = ChatMessage.objects.filter(
+        Q(sender=request.user, receiver=other_user) |
+        Q(sender=other_user, receiver=request.user)
+    ).order_by("created_at")
+
+    # mark unread messages (ที่คนนี้รับ) ว่า read
+    msgs.filter(receiver=request.user, is_read=False).update(is_read=True)
+
+    data = [
+        {
+            "id":           m.id,
+            "body":         m.body,
+            "sender_id":    m.sender_id,
+            "sender":       m.sender.username,
+            "is_mine":      m.sender_id == request.user.id,
+            "is_admin_msg": m.sender.is_staff or m.sender.is_superuser,
+            "is_read":      m.is_read,
+            "created_at":   m.created_at.isoformat(),
+        }
+        for m in msgs
+    ]
+    return Response({"messages": data})
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def chat_conversations(request):
+    """
+    GET /api/chat/conversations/
+    Admin only — ดูรายชื่อ user ทั้งหมดที่มีการสนทนา พร้อม unread count
+    """
+    if not (request.user.is_staff or request.user.is_superuser):
+        return Response({"error": "ไม่มีสิทธิ์"}, status=403)
+
+    from django.contrib.auth.models import User as AuthUser
+    from django.db.models import Q, Max, Count
+
+    # หา user ทั้งหมดที่เคยส่งหรือรับข้อความกับแอดมิน
+    admin_ids = list(AuthUser.objects.filter(
+        Q(is_staff=True) | Q(is_superuser=True)
+    ).values_list("id", flat=True))
+
+    # หา user ที่ไม่ใช่แอดมิน ที่เคยคุย
+    user_ids = set()
+    user_ids.update(
+        ChatMessage.objects.filter(receiver__in=admin_ids)
+        .exclude(sender__in=admin_ids)
+        .values_list("sender_id", flat=True)
+    )
+    user_ids.update(
+        ChatMessage.objects.filter(sender__in=admin_ids)
+        .exclude(receiver__in=admin_ids)
+        .values_list("receiver_id", flat=True)
+    )
+
+    from django.db.models import Q as DQ
+    results = []
+    for uid in user_ids:
+        try:
+            u = AuthUser.objects.get(pk=uid)
+        except AuthUser.DoesNotExist:
+            continue
+
+        msgs = ChatMessage.objects.filter(
+            DQ(sender_id=uid, receiver__in=admin_ids) |
+            DQ(receiver_id=uid, sender__in=admin_ids)
+        ).order_by("-created_at")
+
+        last_msg = msgs.first()
+        unread = msgs.filter(sender_id=uid, is_read=False).count()
+
+        results.append({
+            "user_id":    u.id,
+            "username":   u.username,
+            "email":      u.email,
+            "first_name": u.first_name,
+            "last_name":  u.last_name,
+            "unread":     unread,
+            "last_body":  last_msg.body if last_msg else "",
+            "last_at":    last_msg.created_at.isoformat() if last_msg else None,
+        })
+
+    # เรียงตาม unread ก่อน แล้วตาม last_at
+    results.sort(key=lambda x: (-x["unread"], x["last_at"] or ""), reverse=False)
+    results.sort(key=lambda x: x["unread"], reverse=True)
+
+    return Response({"conversations": results})

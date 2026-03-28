@@ -133,3 +133,25 @@ export interface DashboardResponse {
   latest_signals: SignalInfo[];
   top_bullish: SignalInfo[];
 }
+
+export interface ChatMessageInfo {
+  id: number;
+  body: string;
+  sender_id: number;
+  sender: string;
+  is_mine: boolean;
+  is_admin_msg: boolean;
+  is_read: boolean;
+  created_at: string;
+}
+
+export interface ChatConversation {
+  user_id: number;
+  username: string;
+  email: string;
+  first_name: string;
+  last_name: string;
+  unread: number;
+  last_body: string;
+  last_at: string | null;
+}
