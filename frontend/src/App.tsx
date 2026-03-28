@@ -20,7 +20,6 @@ import Portfolio from "./pages/Portfolio"
 import EngineBacktest from "./pages/EngineBacktest"
 import Watchlist from "./pages/Watchlist"
 import Fundamental from "./pages/Fundamental"
-import EconomicCalendar from "./pages/EconomicCalendar"
 import Subscription from "./pages/Subscription"
 import { AutoTermHighlight, TermAssistantProvider, TermAssistantToggle } from "./components/TermAssistant"
 import TickerTape from "./components/TickerTape"
@@ -36,13 +35,12 @@ const NAV_ITEMS = [
   { id:"portfolio",    label:"Portfolio",           icon:"💼" },
   { id:"scanner",      label:"สแกนหุ้น",           icon:"🔍" },
   { id:"chart",        label:"กราฟ",               icon:"📈" },
-  { id:"calendar",     label:"ปฏิทินเศรษฐกิจ",    icon:"📅" },
   { id:"strategy",     label:"กลยุทธ์",             icon:"🎯" },
   { id:"backtest",     label:"Backtest",            icon:"⏪" },
   { id:"guide",        label:"คำแนะนำ",            icon:"💡" },
   { id:"qna",          label:"ถาม-ตอบ",            icon:"💬" },
   { id:"subscription", label:"สมาชิก",             icon:"💳" },
-  { id:"profile",      label:"โปรไฟล์",            icon:"👤" },
+  { id:"profile",      label:"โปรไฟล์ / ตั้งค่า",  icon:"⚙️" },
   { id:"contact",      label:"ติดต่อเรา",          icon:"📞" },
 ]
 
@@ -131,7 +129,6 @@ function AppInner() {
             {page === "portfolio"    && <Portfolio onOpenChart={openChart} />}
             {page === "scanner"      && <Scanner onOpenChart={openChart} onAnalyze={openAnalyze} />}
             {page === "chart"        && <Chart symbol={chartSymbol} />}
-            {page === "calendar"     && <EconomicCalendar />}
             {page === "strategy"     && <StrategyBuilder />}
             {page === "backtest"     && <EngineBacktest onOpenChart={openChart} />}
             {page === "guide"        && <Guide />}
