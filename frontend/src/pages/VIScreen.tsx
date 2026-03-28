@@ -375,7 +375,7 @@ export default function VIScreen({ onOpenChart }: { onOpenChart: (s: string) => 
         }}>
           <b>วิธีคำนวณ VI Score (0–100):</b>{" "}
           P/E (25pt) + P/B (20pt) + ROE (20pt) + ปันผล (15pt) + D/E (10pt) + รายได้ YoY (10pt){" "}
-          · ข้อมูลจาก Yahoo Finance · อัปเดตทุก 7 วัน · ใช้เป็นแนวทางเบื้องต้น ไม่ใช่คำแนะนำการลงทุน
+          · ข้อมูลจาก Yahoo Finance · อัปเดตทุก 7 วัน
         </div>
 
       </div>

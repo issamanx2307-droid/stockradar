@@ -156,6 +156,23 @@ function AppInner() {
             {page === "profile"      && <Profile />}
             {page === "contact"      && <Contact />}
           </AutoTermHighlight>
+          {/* ── Legal Disclaimer (ก.ล.ต.) ── */}
+          <div style={{
+            margin: "24px 16px 8px",
+            padding: "10px 16px",
+            background: "var(--bg-elevated)",
+            border: "1px solid var(--border)",
+            borderLeft: "3px solid var(--yellow)",
+            borderRadius: 6,
+            fontSize: 11,
+            color: "var(--text-muted)",
+            lineHeight: 1.7,
+          }}>
+            <span style={{ fontWeight: 700, color: "var(--yellow)" }}>⚠️ คำเตือน:</span>{" "}
+            แพลตฟอร์มนี้เป็นเครื่องมือวิเคราะห์ข้อมูลเชิงสถิติและการคัดกรองหลักทรัพย์เท่านั้น
+            ไม่ถือเป็นคำแนะนำการลงทุน การซื้อขายหลักทรัพย์มีความเสี่ยง
+            ผู้ใช้งานควรศึกษาข้อมูลและตัดสินใจด้วยตนเอง
+          </div>
         </main>
       </div>
       <TickerTape />
