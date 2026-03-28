@@ -27,7 +27,7 @@ function QnaTab() {
   const [query, setQuery]       = useState("")
   const [messages, setMessages] = useState<Msg[]>([{
     id: uid(), role: "assistant",
-    text: "พิมพ์ศัพท์เทคนิคหรือคำถาม เช่น "RSI คืออะไร", "BB Bands ใช้ยังไง"",
+    text: "พิมพ์ศัพท์เทคนิคหรือคำถาม เช่น RSI คืออะไร, BB Bands ใช้ยังไง",
   }])
   const [busy, setBusy] = useState(false)
   const bottomRef = useRef<HTMLDivElement | null>(null)
