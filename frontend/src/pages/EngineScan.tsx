@@ -129,6 +129,14 @@ function AnalyzePanel({ symbol, onClose, onOpenChart }:
                 <span style={{ position:"absolute", inset:0, display:"flex", alignItems:"center",
                   justifyContent:"center", fontWeight:700, fontSize:14 }}>{data.score}</span>
               </div>
+              <div style={{ display:"flex", flexDirection:"column", gap:4, flexShrink:0 }}>
+                <span style={{ fontSize:11, fontWeight:700, padding:"2px 8px", borderRadius:4,
+                  background: data.score>=80?"#00c85322":data.score>=60?"#00e67622":data.score>=40?"#ffd60022":"#ff525222",
+                  color: data.score>=80?"#00c853":data.score>=60?"#00e676":data.score>=40?"#ffd600":"#ff5252" }}>
+                  {data.score>=80?"⭐ ดีมาก":data.score>=60?"✅ ดี":data.score>=40?"⚠️ พอใช้":"❌ อ่อน"}
+                </span>
+                <span style={{ fontSize:10, color:"var(--text-muted)" }}>Score / 100</span>
+              </div>
               <div style={{ flex:1, fontSize:13, display:"flex", flexWrap:"wrap", gap:"4px 16px" }}>
                 {[
                   { label:"Entry",    val:`฿${(data.entry||0).toLocaleString("th-TH",{minimumFractionDigits:2})}`, color:"var(--green)" },
@@ -268,14 +276,28 @@ export default function EngineScan({ onOpenChart }: { onOpenChart?: (s: string) 
             <div>
               <div style={{ fontSize:11, color:"var(--text-muted)", marginBottom:4 }}>Score ขั้นต่ำ</div>
               <div style={{ display:"flex", gap:4 }}>
-                {[0,40,60,80].map(s => (
-                  <button key={s} onClick={() => setMinScore(s)} style={{
-                    padding:"6px 12px", borderRadius:6, fontSize:12, fontWeight:600, cursor:"pointer",
-                    border:`1px solid ${minScore===s?"var(--accent)":"var(--border)"}`,
-                    background: minScore===s?"var(--accent-dim)":"transparent",
-                    color: minScore===s?"var(--accent)":"var(--text-muted)",
-                  }}>{s===0?"All":`≥${s}`}</button>
+                {([
+                  { val:0,  label:"All",  hint:"ทั้งหมด" },
+                  { val:40, label:"≥40",  hint:"พอใช้" },
+                  { val:60, label:"≥60",  hint:"ดี" },
+                  { val:80, label:"≥80",  hint:"ดีมาก" },
+                ] as const).map(({ val, label, hint }) => (
+                  <button key={val} onClick={() => setMinScore(val)}
+                    title={`Score ${label} — ${hint}`}
+                    style={{
+                      padding:"6px 12px", borderRadius:6, fontSize:12, fontWeight:600, cursor:"pointer",
+                      border:`1px solid ${minScore===val?"var(--accent)":"var(--border)"}`,
+                      background: minScore===val?"var(--accent-dim)":"transparent",
+                      color: minScore===val?"var(--accent)":"var(--text-muted)",
+                      display:"flex", flexDirection:"column", alignItems:"center", gap:1,
+                    }}>
+                    <span>{label}</span>
+                    <span style={{ fontSize:9, fontWeight:400, opacity:0.7 }}>{hint}</span>
+                  </button>
                 ))}
+              </div>
+              <div style={{ fontSize:10, color:"var(--text-muted)", marginTop:5 }}>
+                ≥80 ดีมาก · ≥60 ดี · ≥40 พอใช้ · &lt;40 อ่อน (0–100)
               </div>
             </div>
 

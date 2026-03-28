@@ -325,20 +325,29 @@ function ResultPanel({ result, mode }: { result: BacktestResultData, mode: strin
           <div>
             {/* Main stats grid */}
             <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginBottom: 16 }}>
-              <StatCard label="กำไรรวม" value={fmtPct(r.total_return)} color={retColor} size="lg" />
-              <StatCard label="Win Rate" value={`${fmt(r.win_rate, 1)}%`} color="var(--green)"
-                sub={`${r.win_trades}W / ${r.loss_trades}L จาก ${r.total_trades} trades`} />
-              <StatCard label="Max Drawdown" value={`-${fmt(r.max_drawdown)}%`} color="var(--red)" />
+              <StatCard label="กำไรรวม" value={fmtPct(r.total_return)} color={retColor} size="lg"
+                sub={r.total_return>=20?"ดีมาก":r.total_return>=10?"ดี":r.total_return>=0?"พอใช้":"ขาดทุน"} />
+              <StatCard label="Win Rate" value={`${fmt(r.win_rate, 1)}%`}
+                color={r.win_rate>=60?"var(--green)":r.win_rate>=50?"var(--yellow)":"var(--red)"}
+                sub={`${r.win_trades}W / ${r.loss_trades}L · ≥60% ดีมาก · ≥50% ดี · <40% แย่`} />
+              <StatCard label="Max Drawdown" value={`-${fmt(r.max_drawdown)}%`}
+                color={r.max_drawdown<=10?"var(--green)":r.max_drawdown<=20?"var(--yellow)":"var(--red)"}
+                sub={"<10% ดีมาก · <20% ดี · >30% อันตราย"} />
               <StatCard label="Sharpe Ratio" value={fmt(r.sharpe_ratio)}
-                color={r.sharpe_ratio >= 1 ? "var(--green)" : "var(--text-secondary)"} />
+                color={r.sharpe_ratio>=2?"#00c853":r.sharpe_ratio>=1?"var(--green)":r.sharpe_ratio>=0.5?"var(--yellow)":"var(--red)"}
+                sub={"≥2 ดีมาก · ≥1 ดี · ≥0.5 พอใช้ · <0 แย่"} />
             </div>
 
             <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginBottom: 16 }}>
               <StatCard label="Profit Factor" value={fmt(r.profit_factor)}
-                color={r.profit_factor >= 1.5 ? "var(--green)" : "var(--yellow)"} />
-              <StatCard label="กำไรเฉลี่ย/trade" value={fmtPct(r.avg_win)} color="var(--green)" />
-              <StatCard label="ขาดทุนเฉลี่ย/trade" value={fmtPct(r.avg_loss)} color="var(--red)" />
-              <StatCard label="Volatility" value={`${fmt(r.volatility)}%`} color="var(--yellow)" />
+                color={r.profit_factor>=2?"#00c853":r.profit_factor>=1.5?"var(--green)":r.profit_factor>=1?"var(--yellow)":"var(--red)"}
+                sub={"≥2 ดีมาก · ≥1.5 ดี · ≥1 คุ้มทุน · <1 ขาดทุน"} />
+              <StatCard label="กำไรเฉลี่ย/trade" value={fmtPct(r.avg_win)} color="var(--green)"
+                sub={"≥5% ดีมาก · ≥2% ดี"} />
+              <StatCard label="ขาดทุนเฉลี่ย/trade" value={fmtPct(r.avg_loss)} color="var(--red)"
+                sub={`ควรน้อยกว่ากำไรเฉลี่ย (${fmtPct(r.avg_win)})`} />
+              <StatCard label="Volatility" value={`${fmt(r.volatility)}%`} color="var(--yellow)"
+                sub={"ความผันผวนของ equity curve · ต่ำ = เสถียร"} />
             </div>
 
             {/* Comparison */}

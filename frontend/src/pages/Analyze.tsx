@@ -102,10 +102,22 @@ export default function Analyze({ onOpenChart, initialSymbol }: {
                 {data.symbol}
               </span>
               <DecisionBadge decision={data.decision} />
-              <div style={{ fontFamily: "var(--font-mono)", fontSize: 28, fontWeight: 700 }}>
-                {typeof data.score === "number" ? data.score : (data as any).score?.total_score}
-                <span style={{ fontSize: 14, color: "var(--text-muted)" }}>/100</span>
-              </div>
+              {(() => {
+                const sc = typeof data.score === "number" ? data.score : ((data as any).score?.total_score ?? 0)
+                const color = sc>=80?"#00c853":sc>=60?"var(--green)":sc>=40?"var(--yellow)":"var(--red)"
+                const grade = sc>=80?"ดีมาก":sc>=60?"ดี":sc>=40?"พอใช้":"อ่อน"
+                return (
+                  <div style={{ display:"flex", alignItems:"baseline", gap:8 }}>
+                    <span style={{ fontFamily:"var(--font-mono)", fontSize:28, fontWeight:700, color }}>
+                      {sc}<span style={{ fontSize:14, color:"var(--text-muted)" }}>/100</span>
+                    </span>
+                    <span style={{ fontSize:13, fontWeight:700, padding:"3px 10px", borderRadius:6,
+                      background:`${color}22`, color }}>
+                      {sc>=80?"⭐ ":sc>=60?"✅ ":sc>=40?"⚠️ ":"❌ "}{grade}
+                    </span>
+                  </div>
+                )
+              })()}
             </div>
 
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
@@ -117,6 +129,13 @@ export default function Analyze({ onOpenChart, initialSymbol }: {
                   {BREAKDOWN_CONFIG.map(({ key, label, max, color }) => {
                     const val = bd[key] ?? 0
                     const pct = (val / max) * 100
+                    // threshold hints per dimension
+                    const hints: Record<string,string> = {
+                      trend:      "ดีมาก ≥30 · ดี ≥20 · อ่อน <15",
+                      momentum:   "ดีมาก ≥18 · ดี ≥12 · อ่อน <8",
+                      volume:     "ดีมาก ≥10 · ดี ≥7 · อ่อน <5",
+                      volatility: "ดีมาก ≥7 · ดี ≥5 · อ่อน <3",
+                    }
                     return (
                       <div key={key}>
                         <div style={{ display: "flex", justifyContent: "space-between",
@@ -130,13 +149,16 @@ export default function Analyze({ onOpenChart, initialSymbol }: {
                           <div style={{ width: `${pct}%`, height: "100%", background: color,
                             borderRadius: 4, transition: "width 0.6s ease" }} />
                         </div>
+                        <div style={{ fontSize: 10, color: "var(--text-muted)", marginTop: 2 }}>
+                          {hints[key]}
+                        </div>
                       </div>
                     )
                   })}
                   {(bd.risk_penalty ?? 0) > 0 && (
                     <div style={{ fontSize: 12, color: "var(--red)",
                       background: "rgba(255,82,82,0.08)", borderRadius: 6, padding: "6px 10px" }}>
-                      ⚠️ Risk Penalty: −{bd.risk_penalty} คะแนน
+                      ⚠️ Risk Penalty: −{bd.risk_penalty} คะแนน (หักเมื่อ Risk % สูงเกิน)
                     </div>
                   )}
                 </div>
@@ -147,20 +169,22 @@ export default function Analyze({ onOpenChart, initialSymbol }: {
                 <div className="card-title">💰 Trade Setup</div>
                 <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
                   {[
-                    { label: "Entry",         val: data.entry?.toLocaleString("th-TH", { minimumFractionDigits: 2 }),  color: "var(--green)"  },
-                    { label: "Stop Loss",     val: data.stop_loss?.toLocaleString("th-TH", { minimumFractionDigits: 2 }), color: "var(--red)" },
-                    { label: "Risk %",        val: `${data.risk_pct}%`, color: "var(--yellow)" },
-                    { label: "Position Size", val: `${data.size?.toLocaleString() ?? "-"} หุ้น`, color: "var(--accent)" },
+                    { label: "Entry",         val: data.entry?.toLocaleString("th-TH", { minimumFractionDigits: 2 }),  color: "var(--green)",  hint: "ราคาที่เหมาะสมในการเข้าซื้อ" },
+                    { label: "Stop Loss",     val: data.stop_loss?.toLocaleString("th-TH", { minimumFractionDigits: 2 }), color: "var(--red)", hint: "ราคาตัดขาดทุน — ออกทันทีเมื่อหลุดระดับนี้" },
+                    { label: "Risk %",        val: `${data.risk_pct}%`, color: (data.risk_pct??0)<=2?"var(--green)":(data.risk_pct??0)<=5?"var(--yellow)":"var(--red)", hint: "ดี ≤2% · พอใช้ ≤5% · สูง >5% ต่อ trade" },
+                    { label: "Position Size", val: `${data.size?.toLocaleString() ?? "-"} หุ้น`, color: "var(--accent)", hint: "จำนวนหุ้นที่แนะนำตามเงินทุนที่กรอก" },
                     { label: "ต้นทุน",        val: data.size && data.entry
                         ? `฿${(data.size * data.entry).toLocaleString("th-TH", { maximumFractionDigits: 0 })}`
-                        : "-", color: "var(--text-primary)" },
-                    { label: "RSI 14",        val: data.rsi?.toFixed(1) ?? "-",  color: "var(--blue)"   },
-                    { label: "ADX 14",        val: data.adx?.toFixed(1) ?? "-",  color: "var(--purple, #ce93d8)" },
-                  ].map(({ label, val, color }) => (
-                    <div key={label} style={{ display: "flex", justifyContent: "space-between",
-                      fontSize: 13, borderBottom: "1px solid var(--border)", paddingBottom: 8 }}>
-                      <span style={{ color: "var(--text-muted)" }}>{label}</span>
-                      <span style={{ fontFamily: "var(--font-mono)", fontWeight: 700, color }}>{val}</span>
+                        : "-", color: "var(--text-primary)", hint: "เงินที่ใช้ซื้อ = ราคา × จำนวนหุ้น" },
+                    { label: "RSI 14",        val: data.rsi?.toFixed(1) ?? "-",  color: "var(--blue)",  hint: ">70 Overbought · 50–70 Bullish · 30–50 Neutral · <30 Oversold" },
+                    { label: "ADX 14",        val: data.adx?.toFixed(1) ?? "-",  color: "var(--purple, #ce93d8)", hint: ">25 มีแนวโน้มแข็งแกร่ง · 20–25 เริ่มมีแนวโน้ม · <20 Sideways" },
+                  ].map(({ label, val, color, hint }) => (
+                    <div key={label} style={{ borderBottom: "1px solid var(--border)", paddingBottom: 8 }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13 }}>
+                        <span style={{ color: "var(--text-muted)" }}>{label}</span>
+                        <span style={{ fontFamily: "var(--font-mono)", fontWeight: 700, color }}>{val}</span>
+                      </div>
+                      <div style={{ fontSize: 10, color: "var(--text-muted)", marginTop: 1 }}>{hint}</div>
                     </div>
                   ))}
                 </div>

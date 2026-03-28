@@ -255,17 +255,31 @@ export default function Scanner({ onOpenChart, onAnalyze }: {
 
             {/* Group 4: Score & Actions */}
             <div>
-              <div className="filter-group-title"><span>🎯</span> การประมวลผล</div>
+              <div className="filter-group-title"><span>🎯</span> Score ขั้นต่ำ</div>
               <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                 <div style={{ display: "flex", gap: 4 }}>
-                  {["", "70", "80", "90"].map(v => (
-                    <button key={v} onClick={() => setMinScore(v)} style={{
-                      flex: 1, padding: "8px 0", borderRadius: 6, fontSize: 11, fontWeight: 700, cursor: "pointer",
-                      border: `1px solid ${minScore === v ? "var(--accent)" : "var(--border)"}`,
-                      background: minScore === v ? "var(--accent-dim)" : "transparent",
-                      color: minScore === v ? "var(--accent)" : "var(--text-secondary)",
-                    }}>{v || "All"}</button>
+                  {([
+                    { v:"",   label:"All",  hint:"ทั้งหมด" },
+                    { v:"70", label:"≥70",  hint:"ดี" },
+                    { v:"80", label:"≥80",  hint:"ดีมาก" },
+                    { v:"90", label:"≥90",  hint:"ยอดเยี่ยม" },
+                  ] as const).map(({ v, label, hint }) => (
+                    <button key={v} onClick={() => setMinScore(v)}
+                      title={`Score ${label} — ${hint}`}
+                      style={{
+                        flex: 1, padding: "6px 0", borderRadius: 6, fontSize: 11, fontWeight: 700, cursor: "pointer",
+                        border: `1px solid ${minScore === v ? "var(--accent)" : "var(--border)"}`,
+                        background: minScore === v ? "var(--accent-dim)" : "transparent",
+                        color: minScore === v ? "var(--accent)" : "var(--text-secondary)",
+                        display:"flex", flexDirection:"column", alignItems:"center", gap:1,
+                      }}>
+                      <span>{label}</span>
+                      <span style={{ fontSize:9, fontWeight:400, opacity:0.7 }}>{hint}</span>
+                    </button>
                   ))}
+                </div>
+                <div style={{ fontSize:10, color:"var(--text-muted)" }}>
+                  ≥80 ดีมาก · ≥60 ดี · ≥40 พอใช้ · &lt;40 อ่อน (0–100)
                 </div>
                 <div style={{ display: "flex", gap: 8 }}>
                   <button className="btn btn-primary" style={{ flex: 1.2, height: 38 }} onClick={loadData} disabled={loading}>

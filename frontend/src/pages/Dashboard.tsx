@@ -46,14 +46,38 @@ function Badge({ type }: { type: string }) {
 function ScoreBar({ score }: { score: number }) {
   const s = Number(score) || 0
   const color = s>=80?"#00c853":s>=60?"var(--green)":s>=40?"var(--yellow)":"var(--red)"
+  const grade = s>=80?"ดีมาก":s>=60?"ดี":s>=40?"พอใช้":"อ่อน"
   return (
-    <div style={{ display:"flex", alignItems:"center", gap:6 }}>
+    <div style={{ display:"flex", alignItems:"center", gap:6 }}
+      title={`Score ${s} — ${grade}\n≥80 ดีมาก (STRONG BUY) | 60–79 ดี (BUY) | 40–59 พอใช้ (HOLD) | <40 อ่อน`}>
       <div style={{ flex:1, height:5, background:"var(--border)", borderRadius:3 }}>
         <div style={{ width:`${s}%`, height:"100%", background:color, borderRadius:3 }} />
       </div>
       <span style={{ fontFamily:"var(--font-mono)", fontSize:12, fontWeight:700, color, minWidth:28, textAlign:"right" }}>
         {s>0?s.toFixed(0):"-"}
       </span>
+    </div>
+  )
+}
+
+// Score legend strip (shown above signal table)
+function ScoreLegend() {
+  return (
+    <div style={{ display:"flex", gap:16, alignItems:"center", padding:"6px 14px",
+      background:"var(--bg-elevated)", border:"1px solid var(--border)",
+      borderTop:"none", fontSize:11, flexWrap:"wrap" }}>
+      <span style={{ color:"var(--text-muted)", fontWeight:600 }}>Score:</span>
+      {([
+        { range:"≥80", label:"ดีมาก — STRONG BUY", color:"#00c853" },
+        { range:"60–79", label:"ดี — BUY",          color:"var(--green)" },
+        { range:"40–59", label:"พอใช้ — HOLD",      color:"var(--yellow)" },
+        { range:"<40",  label:"อ่อน — หลีกเลี่ยง",  color:"var(--red)" },
+      ] as const).map(({ range, label, color }) => (
+        <span key={range} style={{ display:"flex", alignItems:"center", gap:5 }}>
+          <span style={{ width:8, height:8, borderRadius:2, background:color, display:"inline-block", flexShrink:0 }}/>
+          <span style={{ color }}><b>{range}</b> {label}</span>
+        </span>
+      ))}
     </div>
   )
 }
@@ -270,6 +294,9 @@ export default function Dashboard({ onOpenChart }: { onOpenChart:(s:string)=>voi
                 {sigLoading ? "⏳" : `${signals.length} รายการ`}
               </span>
             </div>
+
+            {/* Score Legend */}
+            <ScoreLegend />
 
             {/* Signal Table */}
             <div style={{ background:"var(--bg-surface)", border:"1px solid var(--border)",
