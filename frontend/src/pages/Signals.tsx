@@ -4,9 +4,9 @@ import { SignalInfo } from "../api/types"
 import { TermText } from "../components/TermAssistant"
 
 const SIGNAL_LABELS: Record<string, string> = {
-  BUY: "ซื้อ", STRONG_BUY: "ซื้อแรง", BREAKOUT: "Breakout",
+  BUY: "โมเมนตัมบวก", STRONG_BUY: "โมเมนตัมบวกแรง", BREAKOUT: "Breakout",
   GOLDEN_CROSS: "Golden Cross", OVERSOLD: "Oversold",
-  SELL: "ขาย", STRONG_SELL: "ขายแรง", DEATH_CROSS: "Death Cross",
+  SELL: "โมเมนตัมลบ", STRONG_SELL: "โมเมนตัมลบแรง", DEATH_CROSS: "Death Cross",
   BREAKDOWN: "Breakdown", OVERBOUGHT: "Overbought",
   WATCH: "เฝ้าดู", ALERT: "แจ้งเตือน",
 }

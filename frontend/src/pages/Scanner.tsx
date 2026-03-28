@@ -6,8 +6,8 @@ import SymbolInput from "../components/SymbolInput"
 
 const SIG_LABEL: Record<string, string> = {
   GOLDEN_CROSS: "Golden✕", EMA_ALIGNMENT: "EMA Align", EMA_PULLBACK: "EMA Pull",
-  BREAKOUT: "Breakout", BUY: "ซื้อ", STRONG_BUY: "ซื้อแรง", OVERSOLD: "Oversold",
-  DEATH_CROSS: "Death✕", BREAKDOWN: "Breakdown", SELL: "ขาย", STRONG_SELL: "ขายแรง",
+  BREAKOUT: "Breakout", BUY: "โมเมนตัมบวก", STRONG_BUY: "โมเมนตัมบวกแรง", OVERSOLD: "Oversold",
+  DEATH_CROSS: "Death✕", BREAKDOWN: "Breakdown", SELL: "โมเมนตัมลบ", STRONG_SELL: "โมเมนตัมลบแรง",
   OVERBOUGHT: "Overbought", WATCH: "เฝ้าดู", ALERT: "แจ้งเตือน",
 }
 const DIR_COLOR: Record<string, string> = { LONG: "var(--green)", SHORT: "var(--red)", NEUTRAL: "var(--text-muted)" }
@@ -242,8 +242,8 @@ export default function Scanner({ onOpenChart, onAnalyze }: {
                 </select>
                 <select className="filter-select" value={signalType} onChange={e => setSignalType(e.target.value)}>
                   <option value="">สัญญาณ</option>
-                  <option value="BUY">🟢 BUY</option>
-                  <option value="SELL">🔴 SELL</option>
+                  <option value="BUY">🟢 โมเมนตัมบวก</option>
+                  <option value="SELL">🔴 โมเมนตัมลบ</option>
                   <option value="BREAKOUT">🚀 Breakout</option>
                 </select>
                 <input className="filter-select" placeholder="ADX ≥" type="number"

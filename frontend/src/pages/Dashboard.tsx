@@ -4,9 +4,9 @@ import { SignalInfo } from "../api/types"
 import { TermText } from "../components/TermAssistant"
 
 const SIGNAL_LABELS: Record<string, string> = {
-  BUY:"ซื้อ", STRONG_BUY:"ซื้อแรง", BREAKOUT:"Breakout",
+  BUY:"โมเมนตัมบวก", STRONG_BUY:"โมเมนตัมบวกแรง", BREAKOUT:"Breakout",
   GOLDEN_CROSS:"Golden✕", OVERSOLD:"Oversold", EMA_ALIGNMENT:"EMA Align",
-  EMA_PULLBACK:"EMA Pull", SELL:"ขาย", STRONG_SELL:"ขายแรง",
+  EMA_PULLBACK:"EMA Pull", SELL:"โมเมนตัมลบ", STRONG_SELL:"โมเมนตัมลบแรง",
   DEATH_CROSS:"Death✕", BREAKDOWN:"Breakdown", OVERBOUGHT:"Overbought",
   WATCH:"เฝ้าดู", ALERT:"แจ้งเตือน",
 }
@@ -146,8 +146,8 @@ const DEFAULT_FILTER: FilterState = {
 // ── Tab Config ────────────────────────────────────────────
 const TABS = [
   { id:"all",      label:"ทั้งหมด",      icon:"📋", dir:"",      color:"var(--text-primary)" },
-  { id:"buy",      label:"สัญญาณซื้อ",   icon:"🟢", dir:"LONG",  color:"var(--green)" },
-  { id:"sell",     label:"สัญญาณขาย",   icon:"🔴", dir:"SHORT", color:"var(--red)"   },
+  { id:"buy",      label:"สัญญาณขาขึ้น",  icon:"🟢", dir:"LONG",  color:"var(--green)" },
+  { id:"sell",     label:"สัญญาณขาลง",  icon:"🔴", dir:"SHORT", color:"var(--red)"   },
   { id:"breakout", label:"Breakout",    icon:"🚀", dir:"",      color:"var(--accent)" },
   { id:"watch",    label:"เฝ้าดู",      icon:"👁️", dir:"",      color:"var(--text-muted)" },
 ]

@@ -5,11 +5,11 @@
 interface Props { decision: string; size?: "sm" | "md" }
 
 const CONFIG: Record<string, { label: string; bg: string; color: string }> = {
-  "STRONG BUY": { label: "💚 STRONG BUY", bg: "rgba(0,200,83,0.18)",  color: "#00c853" },
-  "BUY":        { label: "🟢 BUY",        bg: "rgba(0,230,118,0.12)", color: "#00e676" },
-  "HOLD":       { label: "🟡 HOLD",       bg: "rgba(255,214,0,0.12)", color: "#ffd600" },
-  "WATCH":      { label: "🔵 WATCH",      bg: "rgba(41,182,246,0.12)",color: "#29b6f6" },
-  "SELL":       { label: "🔴 SELL",       bg: "rgba(255,82,82,0.12)", color: "#ff5252" },
+  "STRONG BUY": { label: "💚 โมเมนตัมบวกแรง", bg: "rgba(0,200,83,0.18)",  color: "#00c853" },
+  "BUY":        { label: "🟢 โมเมนตัมบวก",    bg: "rgba(0,230,118,0.12)", color: "#00e676" },
+  "HOLD":       { label: "🟡 รอสัญญาณชัด",    bg: "rgba(255,214,0,0.12)", color: "#ffd600" },
+  "WATCH":      { label: "🔵 เฝ้าดู",          bg: "rgba(41,182,246,0.12)",color: "#29b6f6" },
+  "SELL":       { label: "🔴 โมเมนตัมลบ",      bg: "rgba(255,82,82,0.12)", color: "#ff5252" },
 }
 
 export default function DecisionBadge({ decision, size = "md" }: Props) {

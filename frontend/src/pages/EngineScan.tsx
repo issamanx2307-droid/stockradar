@@ -250,6 +250,10 @@ export default function EngineScan({ onOpenChart }: { onOpenChart?: (s: string) 
   const DECISION_COLORS: Record<string,string> = {
     "STRONG BUY":"#00c853","BUY":"#00e676","HOLD":"#ffd600","WATCH":"#29b6f6","SELL":"#ff5252"
   }
+  const DECISION_LABELS: Record<string,string> = {
+    "STRONG BUY":"โมเมนตัมบวกแรง","BUY":"โมเมนตัมบวก",
+    "HOLD":"รอสัญญาณชัด","WATCH":"เฝ้าดู","SELL":"โมเมนตัมลบ"
+  }
 
   return (
     <div className="fade-up">
@@ -342,7 +346,7 @@ export default function EngineScan({ onOpenChart }: { onOpenChart?: (s: string) 
               return count > 0 ? (
                 <div key={label} style={{ background:`${color}15`, border:`1px solid ${color}44`,
                   borderRadius:8, padding:"5px 14px", fontSize:12, fontWeight:700, color }}>
-                  {label} {count}
+                  {DECISION_LABELS[label] ?? label} {count}
                 </div>
               ) : null
             })}
