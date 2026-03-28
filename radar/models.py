@@ -42,6 +42,7 @@ class Profile(models.Model):
                                        verbose_name="รูปโปรไฟล์ Google")
     login_via_google = models.BooleanField(default=False, db_index=True,
                                            verbose_name="สมัครด้วย Google")
+    can_use_portfolio = models.BooleanField(default=False, verbose_name="เข้าใช้ Portfolio ได้")
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

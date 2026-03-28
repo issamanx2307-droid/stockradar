@@ -58,7 +58,7 @@ function AppInner() {
   // ── hash-based navigation (persist page on refresh) ──────────────────────
   const VALID_PAGES = [
     "dashboard","engine_scan","watchlist","news","analyze","fundamental",
-    "vi_screen","portfolio","scanner","chart","strategy","backtest",
+    "vi_screen","scanner","chart","strategy","backtest",
     "guide","profile","contact","subscription","admin_panel",
   ]
   function getHashPage(fallback: string) {
@@ -106,6 +106,12 @@ function AppInner() {
     window.location.hash = "analyze"
   }
 
+  useEffect(() => {
+    if (!loading && user && page === "portfolio" && !user.can_use_portfolio) {
+      navigateTo(isAdmin ? "admin_panel" : "dashboard")
+    }
+  }, [user, loading])
+
   if (loading) {
     return (
       <div style={{ height: "100vh", display: "flex", alignItems: "center",
@@ -140,7 +146,11 @@ function AppInner() {
             )}
           </div>
           <nav className="sidebar-nav">
-            {NAV_ITEMS.map(item => (
+            {/* Filter nav items based on permissions */}
+            {NAV_ITEMS.filter(item => {
+              if (item.id === "portfolio") return !!(user?.can_use_portfolio)
+              return true
+            }).map(item => (
               <button key={item.id}
                 className={`nav-btn ${page === item.id ? "active" : ""}`}
                 onClick={() => navigateTo(item.id)}>
@@ -198,7 +208,7 @@ function AppInner() {
             {page === "analyze"      && <Analyze onOpenChart={openChart} initialSymbol={analyzeSymbol} />}
             {page === "fundamental"  && <Fundamental onOpenChart={openChart} />}
             {page === "vi_screen"    && <VIScreen onOpenChart={openChart} />}
-            {page === "portfolio"    && <Portfolio onOpenChart={openChart} />}
+            {page === "portfolio" && user?.can_use_portfolio && <Portfolio onOpenChart={openChart} />}
             {page === "scanner"      && <Scanner onOpenChart={openChart} onAnalyze={openAnalyze} />}
             {page === "chart"        && <Chart symbol={chartSymbol} />}
             {page === "strategy"     && <StrategyBuilder />}

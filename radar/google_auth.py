@@ -156,6 +156,7 @@ def me(request):
         "expires_at": expires_at,
         "is_staff":   request.user.is_staff,
         "is_superuser": request.user.is_superuser,
+        "can_use_portfolio": getattr(getattr(request.user, "profile", None), "can_use_portfolio", False),
     })
 
 

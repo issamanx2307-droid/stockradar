@@ -10,6 +10,7 @@ export interface UserInfo {
   first_name: string; picture?: string
   tier: string; plan: any
   is_staff?: boolean; is_superuser?: boolean
+  can_use_portfolio?: boolean
 }
 
 interface AuthCtx {

@@ -153,6 +153,97 @@ function QaPendingPanel({ token }: { token: string }) {
   )
 }
 
+interface UserFlagRow {
+  id: number
+  username: string
+  email: string
+  tier: string
+  can_use_portfolio: boolean
+  date_joined: string
+}
+
+function UserPortfolioPanel({ token }: { token: string }) {
+  const [users, setUsers] = useState<UserFlagRow[]>([])
+  const [loading, setLoading] = useState(true)
+  const [msg, setMsg] = useState("")
+
+  useEffect(() => {
+    fetch(`${API_BASE}/admin/users/`, {
+      headers: { Authorization: `Token ${token}` },
+    })
+      .then(r => r.json())
+      .then(d => { setUsers(d.results || []); setLoading(false) })
+      .catch(() => setLoading(false))
+  }, [token])
+
+  async function toggle(userId: number, current: boolean) {
+    setMsg("")
+    const res = await fetch(`${API_BASE}/admin/users/${userId}/portfolio/`, {
+      method: "PATCH",
+      headers: { Authorization: `Token ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ can_use_portfolio: !current }),
+    })
+    if (res.ok) {
+      setUsers(prev => prev.map(u => u.id === userId ? { ...u, can_use_portfolio: !current } : u))
+      setMsg(`✅ อัปเดตสำเร็จ`)
+    } else {
+      setMsg("❌ เกิดข้อผิดพลาด")
+    }
+  }
+
+  return (
+    <div style={{ marginTop: 32 }}>
+      <h2 style={{ fontSize: 16, fontWeight: 700, color: "#7a90a8", letterSpacing: 1, marginBottom: 16 }}>
+        💼 สิทธิ์ Portfolio ({loading ? "..." : users.length} users)
+      </h2>
+      {msg && (
+        <div style={{
+          marginBottom: 12, padding: "8px 14px", borderRadius: 8, fontSize: 13,
+          background: msg.startsWith("✅") ? "rgba(0,230,118,.08)" : "rgba(255,82,82,.08)",
+          color: msg.startsWith("✅") ? "#00e676" : "#ff5252",
+          border: `1px solid ${msg.startsWith("✅") ? "rgba(0,230,118,.25)" : "rgba(255,82,82,.25)"}`,
+        }}>{msg}</div>
+      )}
+      {loading ? (
+        <div style={{ color: "#5a6e80", fontSize: 13 }}>กำลังโหลด...</div>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          {users.map(u => (
+            <div key={u.id} style={{
+              display: "flex", alignItems: "center", justifyContent: "space-between",
+              padding: "10px 16px",
+              background: "rgba(255,255,255,.03)",
+              border: "1px solid rgba(255,255,255,.07)",
+              borderRadius: 8,
+            }}>
+              <div>
+                <span style={{ fontSize: 14, color: "#e2e8f0", fontWeight: 600 }}>{u.username}</span>
+                <span style={{ fontSize: 12, color: "#5a6e80", marginLeft: 10 }}>{u.email}</span>
+                <span style={{
+                  fontSize: 11, marginLeft: 8, padding: "1px 7px", borderRadius: 10,
+                  background: "rgba(0,212,255,.1)", color: "#00d4ff",
+                }}>{u.tier}</span>
+                <span style={{ fontSize: 11, color: "#3a4a58", marginLeft: 8 }}>{u.date_joined}</span>
+              </div>
+              <button
+                onClick={() => toggle(u.id, u.can_use_portfolio)}
+                style={{
+                  padding: "5px 16px", borderRadius: 7, fontSize: 12, fontWeight: 700,
+                  cursor: "pointer", transition: "all .15s",
+                  background: u.can_use_portfolio ? "rgba(0,230,118,.15)" : "rgba(255,255,255,.05)",
+                  border: `1px solid ${u.can_use_portfolio ? "rgba(0,230,118,.35)" : "rgba(255,255,255,.12)"}`,
+                  color: u.can_use_portfolio ? "#00e676" : "#5a6e80",
+                }}>
+                {u.can_use_portfolio ? "✅ เปิดอยู่" : "🔒 ปิดอยู่"}
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function AdminPanel() {
   const { token } = useAuth()
   const [stats, setStats] = useState<SystemStats | null>(null)
@@ -301,6 +392,7 @@ export default function AdminPanel() {
       )}
 
       {token && <QaPendingPanel token={token} />}
+      {token && <UserPortfolioPanel token={token} />}
     </div>
   )
 }

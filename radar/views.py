@@ -1696,6 +1696,46 @@ def admin_refresh_snapshot(request):
         return Response({"status": "error", "message": str(e)}, status=500)
 
 
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def admin_users_list(request):
+    """GET /api/admin/users/ — รายชื่อ user ทั้งหมดพร้อม portfolio flag"""
+    if not (request.user.is_staff or request.user.is_superuser):
+        return Response({"error": "Permission denied"}, status=403)
+    from django.contrib.auth.models import User as AuthUser
+    users = AuthUser.objects.select_related("profile").all().order_by("-date_joined")
+    data = []
+    for u in users:
+        profile = getattr(u, "profile", None)
+        data.append({
+            "id": u.id,
+            "username": u.username,
+            "email": u.email,
+            "tier": getattr(profile, "tier", "FREE"),
+            "can_use_portfolio": getattr(profile, "can_use_portfolio", False),
+            "date_joined": u.date_joined.strftime("%d/%m/%Y"),
+        })
+    return Response({"results": data, "count": len(data)})
+
+
+@api_view(["PATCH"])
+@permission_classes([IsAuthenticated])
+def admin_toggle_portfolio(request, user_id):
+    """PATCH /api/admin/users/<id>/portfolio/ — เปิด/ปิด portfolio flag"""
+    if not (request.user.is_staff or request.user.is_superuser):
+        return Response({"error": "Permission denied"}, status=403)
+    from django.contrib.auth.models import User as AuthUser
+    try:
+        target = AuthUser.objects.select_related("profile").get(id=user_id)
+    except AuthUser.DoesNotExist:
+        return Response({"error": "ไม่พบ user"}, status=404)
+    profile = target.profile
+    enabled = bool(request.data.get("can_use_portfolio", False))
+    profile.can_use_portfolio = enabled
+    profile.save(update_fields=["can_use_portfolio"])
+    return Response({"user_id": user_id, "username": target.username, "can_use_portfolio": enabled})
+
+
 # ─── Thai Economic Indicators API ─────────────────────────────────────────────
 
 @api_view(["GET"])
