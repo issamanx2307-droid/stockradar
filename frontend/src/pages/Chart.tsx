@@ -306,6 +306,12 @@ export default function Chart({ symbol: initSymbol }: { symbol?: string | null }
     {label:"3 เดือน",v:"90"},{label:"6 เดือน",v:"180"},
     {label:"1 ปี",v:"365"},{label:"2 ปี",v:"730"},{label:"5 ปี",v:"1825"},
   ]
+  const TOGGLE_TIPS: Record<string, string> = {
+    EMA:  "EMA — เส้นค่าเฉลี่ยเลขชี้กำลัง (20/50/200) ใช้ดูแนวโน้มราคา",
+    BB:   "Bollinger Bands — แถบความผันผวน เส้นบน=Resistance เส้นล่าง=Support",
+    VOL:  "Volume — ปริมาณซื้อขาย ยิ่งสูงยิ่งยืนยันแนวโน้ม",
+    MACD: "MACD — วัดโมเมนตัม สัญญาณซื้อ/ขายเมื่อตัดเส้น Signal",
+  }
   const TOGGLES = [
     {label:"EMA",  color:"#00d4ff", val:showEMA,  fn:()=>toggle(emaRef,  setShowEMA)},
     {label:"BB",   color:"#6464ff", val:showBB,   fn:()=>toggle(bbRef,   setShowBB)},
@@ -342,7 +348,7 @@ export default function Chart({ symbol: initSymbol }: { symbol?: string | null }
                   border:`1px solid ${val?color:"var(--border)"}`,
                   background: val?`${color}22`:"transparent",
                   color: val?color:"var(--text-muted)",
-                }}><AiTerm token={label}>{label}</AiTerm></button>
+                }} title={TOGGLE_TIPS[label]}>{label}</button>
               ))}
             </div>
           </div>
