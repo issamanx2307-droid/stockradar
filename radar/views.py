@@ -1824,7 +1824,11 @@ def vi_screen_api(request):
     # ── trigger background fetch if DB is empty ──────────────────────────────
     total = FundamentalSnapshot.objects.count()
     if total == 0:
-        fetch_set_fundamentals.delay()
+        try:
+            fetch_set_fundamentals.delay()
+        except Exception:
+            import threading
+            threading.Thread(target=fetch_set_fundamentals, daemon=True).start()
 
     # ── filters ──────────────────────────────────────────────────────────────
     qs = FundamentalSnapshot.objects.select_related("symbol").filter(
