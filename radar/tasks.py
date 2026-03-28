@@ -372,23 +372,25 @@ def fetch_set_fundamentals():
         logger.error("yfinance not installed")
         return
 
-    from .models import Symbol, LatestSnapshot, FundamentalSnapshot
+    from .models import Symbol, FundamentalSnapshot
 
-    # top 150 SET หุ้นตาม volume
-    top_symbols = (
-        LatestSnapshot.objects
-        .filter(exchange="SET", volume_avg20__isnull=False, volume_avg20__gte=1_000_000)
-        .order_by("-volume_avg20")
-        .values_list("symbol", flat=True)[:150]
+    # ดึง SET symbols ทั้งหมดจาก Symbol model โดยตรง
+    symbol_list = list(
+        Symbol.objects.filter(exchange="SET").values_list("symbol", flat=True)
     )
-    symbol_list = list(top_symbols)
     if not symbol_list:
-        logger.warning("fetch_set_fundamentals: no symbols found")
+        logger.warning("fetch_set_fundamentals: no SET symbols found")
         return
 
-    # rotating batch: วันนี้ใช้ offset ไหน
-    day_offset = timezone.now().toordinal() % 3
-    batch = symbol_list[day_offset * 50 : day_offset * 50 + 50]
+    # ถ้า DB ว่างเปล่า (first run) ดึงทุกตัวเลย
+    # ถ้ามีข้อมูลแล้ว ใช้ rotating batch 50 ตัว/วัน เพื่อ refresh
+    from .models import FundamentalSnapshot as _FS
+    if _FS.objects.count() == 0:
+        batch = symbol_list          # fetch ทั้งหมดครั้งแรก
+    else:
+        batch_size = 50
+        day_offset = timezone.now().toordinal() % max(1, len(symbol_list) // batch_size)
+        batch = symbol_list[day_offset * batch_size : day_offset * batch_size + batch_size]
 
     stale_cutoff = timezone.now() - timedelta(days=7)
     updated = skipped = errors = 0
