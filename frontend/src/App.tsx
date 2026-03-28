@@ -20,8 +20,6 @@ import EngineBacktest from "./pages/EngineBacktest"
 import Watchlist from "./pages/Watchlist"
 import Fundamental from "./pages/Fundamental"
 import VIScreen from "./pages/VIScreen"
-import AdminPanel from "./pages/AdminPanel"
-import AdminChat from "./pages/AdminChat"
 import Chat from "./pages/Chat"
 import { AutoTermHighlight, TermAssistantProvider, TermAssistantToggle } from "./components/TermAssistant"
 import TickerTape from "./components/TickerTape"
@@ -47,50 +45,36 @@ const USER_NAV: { id: string; label: string; icon: string }[] = [
   { id: "chat",         label: "ข้อความ",             icon: "💬" },
 ]
 
-// ── เมนูสำหรับ Superadmin (ควบคุมระบบอย่างเดียว) ────────────────────────────
-const ADMIN_NAV: { id: string; label: string; icon: string }[] = [
-  { id: "admin_panel",  label: "ควบคุมระบบ",        icon: "🛠️" },
-  { id: "admin_chat",   label: "กล่องข้อความ",       icon: "💬" },
-  { id: "profile",      label: "โปรไฟล์ / ตั้งค่า",  icon: "⚙️" },
-]
-
 function AppInner() {
   const { user, loading } = useAuth()
   const isAdmin = user?.is_staff || user?.is_superuser
-  const NAV_ITEMS = isAdmin ? ADMIN_NAV : USER_NAV
 
   // ── hash-based navigation (persist page on refresh) ──────────────────────
   const VALID_PAGES = [
     "dashboard","engine_scan","watchlist","news","analyze","fundamental",
     "vi_screen","scanner","chart","strategy","backtest",
-    "guide","profile","contact","subscription","admin_panel","admin_chat","chat",
+    "guide","profile","contact","subscription","chat",
   ]
   function getHashPage(fallback: string) {
     const h = window.location.hash.replace("#", "")
     return VALID_PAGES.includes(h) ? h : fallback
   }
 
-  const [page, setPage] = useState(() => getHashPage(isAdmin ? "admin_panel" : "dashboard"))
+  const [page, setPage] = useState(() => getHashPage("dashboard"))
   const [history, setHistory] = useState<string[]>([])
   const [chartSymbol, setChartSymbol]     = useState<string | null>(null)
   const [analyzeSymbol, setAnalyzeSymbol] = useState<string | null>(null)
   const [chatUnread, setChatUnread]       = useState(0)
   const ws = useRadarWS()
 
-  // ── Poll unread chat count ────────────────────────────────────────────────
+  // ── Poll unread chat count (user only) ───────────────────────────────────
   useEffect(() => {
-    if (!user) return
+    if (!user || isAdmin) return
     async function pollUnread() {
       try {
-        if (isAdmin) {
-          const res = await (await import("./api/client")).api.chatConversations()
-          const total = res.conversations.reduce((s: number, c: any) => s + c.unread, 0)
-          setChatUnread(total)
-        } else {
-          const res = await (await import("./api/client")).api.chatMessages()
-          const unread = res.messages.filter((m: any) => !m.is_mine && !m.is_read).length
-          setChatUnread(unread)
-        }
+        const res = await (await import("./api/client")).api.chatMessages()
+        const unread = res.messages.filter((m: any) => !m.is_mine && !m.is_read).length
+        setChatUnread(unread)
       } catch {/* silent */}
     }
     pollUnread()
@@ -101,12 +85,12 @@ function AppInner() {
   // sync hash → state (browser back/forward)
   useEffect(() => {
     function onHashChange() {
-      const h = getHashPage(isAdmin ? "admin_panel" : "dashboard")
+      const h = getHashPage("dashboard")
       setPage(h); setHistory([])
     }
     window.addEventListener("hashchange", onHashChange)
     return () => window.removeEventListener("hashchange", onHashChange)
-  }, [isAdmin])
+  }, [])
 
   function navigateTo(id: string) {
     if (id !== page) {
@@ -134,7 +118,7 @@ function AppInner() {
 
   useEffect(() => {
     if (!loading && user && page === "portfolio" && !user.can_use_portfolio) {
-      navigateTo(isAdmin ? "admin_panel" : "dashboard")
+      navigateTo("dashboard")
     }
   }, [user, loading])
 
@@ -151,6 +135,36 @@ function AppInner() {
 
   if (!user) return <LandingPage />
 
+  // ── Admin → redirect to Django admin ────────────────────────────────────
+  if (isAdmin) {
+    return (
+      <div style={{
+        height: "100vh", display: "flex", alignItems: "center",
+        justifyContent: "center", background: "var(--bg-main,#0a1929)",
+        flexDirection: "column", gap: 20,
+      }}>
+        <div style={{ fontSize: 48 }}>🛠️</div>
+        <div style={{ color: "var(--text-main)", fontSize: 18, fontWeight: 700 }}>
+          สวัสดี {user.first_name || user.username}
+        </div>
+        <div style={{ color: "var(--text-muted)", fontSize: 13 }}>
+          บัญชีนี้เป็น Admin — กรุณาใช้หน้าจัดการระบบ
+        </div>
+        <a
+          href="/admin/"
+          style={{
+            padding: "12px 32px",
+            background: "linear-gradient(135deg,#1565c0,#0288d1)",
+            color: "#fff", borderRadius: 8, textDecoration: "none",
+            fontSize: 15, fontWeight: 700, letterSpacing: 0.5,
+          }}
+        >
+          เข้า Django Admin →
+        </a>
+      </div>
+    )
+  }
+
   return (
     <TermAssistantProvider>
       <div className="app">
@@ -161,19 +175,9 @@ function AppInner() {
           <div className="sidebar-logo">
             <span className="logo-icon">◈</span>
             <span className="logo-text">Radar<br /><small>หุ้น</small></span>
-            {isAdmin && (
-              <span style={{
-                fontSize: 9, fontWeight: 800, color: "#ff6d00",
-                background: "rgba(255,109,0,.15)", border: "1px solid rgba(255,109,0,.4)",
-                borderRadius: 4, padding: "1px 5px", letterSpacing: 1, marginLeft: 4,
-              }}>
-                ADMIN
-              </span>
-            )}
           </div>
           <nav className="sidebar-nav">
-            {/* Filter nav items based on permissions */}
-            {NAV_ITEMS.filter(item => {
+            {USER_NAV.filter(item => {
               if (item.id === "portfolio") return !!(user?.can_use_portfolio)
               return true
             }).map(item => (
@@ -182,7 +186,7 @@ function AppInner() {
                 onClick={() => navigateTo(item.id)}>
                 <span className="nav-icon" style={{ position: "relative" }}>
                   {item.icon}
-                  {(item.id === "chat" || item.id === "admin_chat") && chatUnread > 0 && (
+                  {item.id === "chat" && chatUnread > 0 && (
                     <span style={{
                       position: "absolute", top: -4, right: -6,
                       background: "#f44336", color: "#fff",
@@ -213,32 +217,26 @@ function AppInner() {
             </div>
           )}
           {/* ── Legal Disclaimer (ก.ล.ต.) ── */}
-          {!isAdmin && (
-            <div style={{
-              margin: "12px 16px 0",
-              padding: "8px 14px",
-              background: "var(--bg-elevated)",
-              border: "1px solid var(--border)",
-              borderLeft: "3px solid var(--yellow)",
-              borderRadius: 6,
-              fontSize: 11,
-              color: "var(--text-muted)",
-              lineHeight: 1.7,
-            }}>
-              <span style={{ fontWeight: 700, color: "#FFD700" }}>⚠️ คำเตือน: </span>
-              <span style={{ fontWeight: 700, color: "#FFD700" }}>
-                แพลตฟอร์มนี้เป็นเครื่องมือวิเคราะห์ข้อมูลเชิงสถิติ แบบที่เผยแพร่ทั่วไป
-                ไม่ถือเป็นคำแนะนำการลงทุน การซื้อขายหลักทรัพย์มีความเสี่ยง
-                ผู้ใช้งานควรศึกษาข้อมูลและตัดสินใจด้วยตนเอง
-              </span>
-            </div>
-          )}
+          <div style={{
+            margin: "12px 16px 0",
+            padding: "8px 14px",
+            background: "var(--bg-elevated)",
+            border: "1px solid var(--border)",
+            borderLeft: "3px solid var(--yellow)",
+            borderRadius: 6,
+            fontSize: 11,
+            color: "var(--text-muted)",
+            lineHeight: 1.7,
+          }}>
+            <span style={{ fontWeight: 700, color: "#FFD700" }}>⚠️ คำเตือน: </span>
+            <span style={{ fontWeight: 700, color: "#FFD700" }}>
+              แพลตฟอร์มนี้เป็นเครื่องมือวิเคราะห์ข้อมูลเชิงสถิติ แบบที่เผยแพร่ทั่วไป
+              ไม่ถือเป็นคำแนะนำการลงทุน การซื้อขายหลักทรัพย์มีความเสี่ยง
+              ผู้ใช้งานควรศึกษาข้อมูลและตัดสินใจด้วยตนเอง
+            </span>
+          </div>
 
           <AutoTermHighlight>
-            {/* Admin pages */}
-            {page === "admin_panel"  && <AdminPanel />}
-
-            {/* User pages */}
             {page === "dashboard"    && <Dashboard ws={ws} onOpenChart={openChart} />}
             {page === "engine_scan"  && <EngineScan onOpenChart={openChart} />}
             {page === "watchlist"    && <Watchlist onOpenChart={openChart} />}
@@ -246,7 +244,7 @@ function AppInner() {
             {page === "analyze"      && <Analyze onOpenChart={openChart} initialSymbol={analyzeSymbol} />}
             {page === "fundamental"  && <Fundamental onOpenChart={openChart} />}
             {page === "vi_screen"    && <VIScreen onOpenChart={openChart} />}
-            {page === "portfolio" && user?.can_use_portfolio && <Portfolio onOpenChart={openChart} />}
+            {page === "portfolio"    && user?.can_use_portfolio && <Portfolio onOpenChart={openChart} />}
             {page === "scanner"      && <Scanner onOpenChart={openChart} onAnalyze={openAnalyze} />}
             {page === "chart"        && <Chart symbol={chartSymbol} />}
             {page === "strategy"     && <StrategyBuilder />}
@@ -254,8 +252,7 @@ function AppInner() {
             {page === "guide"        && <Guide />}
             {page === "profile"      && <Profile />}
             {page === "contact"      && <Contact />}
-            {page === "chat"         && !isAdmin && <Chat onRead={() => setChatUnread(0)} />}
-            {page === "admin_chat"   && isAdmin  && <AdminChat />}
+            {page === "chat"         && <Chat onRead={() => setChatUnread(0)} />}
           </AutoTermHighlight>
         </main>
       </div>
