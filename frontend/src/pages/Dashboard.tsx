@@ -110,47 +110,6 @@ function SignalTable({ signals, onOpenChart }: { signals: SignalInfo[], onOpenCh
   )
 }
 
-// ── Quick Actions ─────────────────────────────────────────
-function QuickActions() {
-  const [scanning, setScanning] = useState(false)
-  const [done, setDone]         = useState(false)
-  const [count, setCount]       = useState(0)
-  const BASE = (import.meta as any).env.VITE_API_URL || "http://127.0.0.1:8000/api"
-
-  async function handleScan() {
-    setScanning(true); setDone(false)
-    try {
-      const res = await fetch(`${BASE}/scanner/run/`, {
-        method:"POST", headers:{"Content-Type":"application/json"}, body:"{}"
-      })
-      const d = await res.json()
-      setCount(d.result?.signals || 0); setDone(true)
-    } catch (_) {}
-    setScanning(false)
-  }
-
-  return (
-    <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
-      <button className="btn btn-primary" style={{ width:"100%", justifyContent:"flex-start" }}
-        onClick={handleScan} disabled={scanning}>
-        {scanning ? "⏳ กำลังสแกน..." : "▶ รัน Scanner ทันที"}
-      </button>
-      {done && <div style={{ fontSize:12, color:"var(--green)", padding:"6px 10px",
-        background:"rgba(0,200,83,.1)", borderRadius:6 }}>✅ พบ {count} สัญญาณ</div>}
-      <button className="btn btn-ghost" style={{ width:"100%", justifyContent:"flex-start" }}
-        onClick={() => fetch(`${BASE}/cache/warmup/`,{method:"POST",headers:{"Content-Type":"application/json"},body:"{}"})}>
-        🔥 Warm-up Cache
-      </button>
-      <div style={{ borderTop:"1px solid var(--border)", paddingTop:8, marginTop:4 }}>
-        <div style={{ fontSize:11, color:"var(--text-muted)" }}>อัปเดตอัตโนมัติทุกวัน จ–ศ</div>
-        <div style={{ fontSize:11, color:"var(--text-muted)", marginTop:2 }}>
-          18:00 หุ้นไทย · 23:00 Indicator · 23:30 Signal
-        </div>
-      </div>
-    </div>
-  )
-}
-
 // ── Filter Bar ────────────────────────────────────────────
 interface FilterState {
   signal_type: string; exchange: string; days: string
@@ -347,11 +306,6 @@ export default function Dashboard({ onOpenChart }: { onOpenChart:(s:string)=>voi
               {signals.length === 0 && <div style={{ fontSize:12, color:"var(--text-muted)" }}>ไม่มีข้อมูล</div>}
             </div>
 
-            {/* Quick Actions */}
-            <div className="card">
-              <div className="card-title">⚡ ดำเนินการด่วน</div>
-              <QuickActions />
-            </div>
 
           </div>
         </div>
