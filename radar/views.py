@@ -2080,7 +2080,6 @@ def chat_messages(request):
         admin_user = request.user
     else:
         other_user = _get_admin_user()
-        admin_user = other_user
         if not other_user:
             return Response({"messages": []})
 
@@ -2119,7 +2118,7 @@ def chat_conversations(request):
         return Response({"error": "ไม่มีสิทธิ์"}, status=403)
 
     from django.contrib.auth.models import User as AuthUser
-    from django.db.models import Q, Max, Count
+    from django.db.models import Q
 
     # หา user ทั้งหมดที่เคยส่งหรือรับข้อความกับแอดมิน
     admin_ids = list(AuthUser.objects.filter(
@@ -2139,7 +2138,6 @@ def chat_conversations(request):
         .values_list("receiver_id", flat=True)
     )
 
-    from django.db.models import Q as DQ
     results = []
     for uid in user_ids:
         try:
@@ -2148,8 +2146,8 @@ def chat_conversations(request):
             continue
 
         msgs = ChatMessage.objects.filter(
-            DQ(sender_id=uid, receiver__in=admin_ids) |
-            DQ(receiver_id=uid, sender__in=admin_ids)
+            Q(sender_id=uid, receiver__in=admin_ids) |
+            Q(receiver_id=uid, sender__in=admin_ids)
         ).order_by("-created_at")
 
         last_msg = msgs.first()
@@ -2166,8 +2164,7 @@ def chat_conversations(request):
             "last_at":    last_msg.created_at.isoformat() if last_msg else None,
         })
 
-    # เรียงตาม unread ก่อน แล้วตาม last_at
+    # เรียงตาม unread ก่อน แล้วตาม last_at (ใหม่สุด)
     results.sort(key=lambda x: (-x["unread"], x["last_at"] or ""), reverse=False)
-    results.sort(key=lambda x: x["unread"], reverse=True)
 
     return Response({"conversations": results})

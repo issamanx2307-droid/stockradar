@@ -443,9 +443,7 @@ class ChatMessageAdmin(admin.ModelAdmin):
     def get_queryset(self, request):
         # แสดงเฉพาะข้อความจาก user ธรรมดา (ไม่ใช่ admin พูดกับ admin)
         qs = super().get_queryset(request)
-        return qs.filter(~Q(sender__is_staff=True) | Q(sender__is_superuser=False)).filter(
-            ~Q(sender__is_superuser=True)
-        )
+        return qs.filter(sender__is_staff=False, sender__is_superuser=False)
 
     def from_badge(self, obj):
         color = "#ef4444" if not obj.is_read else "#6b7280"
