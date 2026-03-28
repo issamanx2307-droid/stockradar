@@ -33,7 +33,7 @@ const USER_NAV: { id: string; label: string; icon: string }[] = [
   { id: "news",         label: "ข่าว & Sentiment",   icon: "📰" },
   { id: "analyze",      label: "วิเคราะห์หุ้น",     icon: "🔬" },
   { id: "fundamental",  label: "Fundamental",         icon: "📊" },
-  { id: "vi_screen",    label: "หุ้นดีราคาต่ำ",       icon: "💎" },
+  { id: "vi_screen",    label: "หุ้น VI",              icon: "💎" },
   { id: "portfolio",    label: "Portfolio",           icon: "💼" },
   { id: "scanner",      label: "สแกนหุ้น",           icon: "🔍" },
   { id: "chart",        label: "กราฟ",               icon: "📈" },
@@ -135,6 +135,26 @@ function AppInner() {
               </button>
             </div>
           )}
+          {/* ── Legal Disclaimer (ก.ล.ต.) ── */}
+          {!isAdmin && (
+            <div style={{
+              margin: "12px 16px 0",
+              padding: "8px 14px",
+              background: "var(--bg-elevated)",
+              border: "1px solid var(--border)",
+              borderLeft: "3px solid var(--yellow)",
+              borderRadius: 6,
+              fontSize: 11,
+              color: "var(--text-muted)",
+              lineHeight: 1.7,
+            }}>
+              <span style={{ fontWeight: 700, color: "var(--yellow)" }}>⚠️ คำเตือน:</span>{" "}
+              แพลตฟอร์มนี้เป็นเครื่องมือวิเคราะห์ข้อมูลเชิงสถิติ แบบที่เผยแพร่ทั่วไป
+              ไม่ถือเป็นคำแนะนำการลงทุน การซื้อขายหลักทรัพย์มีความเสี่ยง
+              ผู้ใช้งานควรศึกษาข้อมูลและตัดสินใจด้วยตนเอง
+            </div>
+          )}
+
           <AutoTermHighlight>
             {/* Admin pages */}
             {page === "admin_panel"  && <AdminPanel />}
@@ -156,23 +176,6 @@ function AppInner() {
             {page === "profile"      && <Profile />}
             {page === "contact"      && <Contact />}
           </AutoTermHighlight>
-          {/* ── Legal Disclaimer (ก.ล.ต.) ── */}
-          <div style={{
-            margin: "24px 16px 8px",
-            padding: "10px 16px",
-            background: "var(--bg-elevated)",
-            border: "1px solid var(--border)",
-            borderLeft: "3px solid var(--yellow)",
-            borderRadius: 6,
-            fontSize: 11,
-            color: "var(--text-muted)",
-            lineHeight: 1.7,
-          }}>
-            <span style={{ fontWeight: 700, color: "var(--yellow)" }}>⚠️ คำเตือน:</span>{" "}
-            แพลตฟอร์มนี้เป็นเครื่องมือวิเคราะห์ข้อมูลเชิงสถิติและการคัดกรองหลักทรัพย์เท่านั้น
-            ไม่ถือเป็นคำแนะนำการลงทุน การซื้อขายหลักทรัพย์มีความเสี่ยง
-            ผู้ใช้งานควรศึกษาข้อมูลและตัดสินใจด้วยตนเอง
-          </div>
         </main>
       </div>
       <TickerTape />

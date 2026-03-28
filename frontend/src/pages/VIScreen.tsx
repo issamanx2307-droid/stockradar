@@ -220,7 +220,7 @@ export default function VIScreen({ onOpenChart }: { onOpenChart: (s: string) => 
   return (
     <div className="fade-up">
       <div className="page-header">
-        <div className="page-title">💎 หุ้นดีราคาต่ำ</div>
+        <div className="page-title">💎 หุ้น VI</div>
         <div className="page-subtitle">VI Screener · คัดหุ้น SET คุณภาพสูงด้วยเกณฑ์ Value Investing</div>
       </div>
 
