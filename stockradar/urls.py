@@ -14,7 +14,7 @@ admin.site.site_title = "Radar หุ้น"
 admin.site.index_title = "จัดการระบบ"
 
 urlpatterns = [
-    path("admin/", admin.site.urls),
+    path("mantapa/", admin.site.urls),
     path("api/", include("radar.urls")),
     path("engine/", include("engine_api.urls")),
     # Auth — Google OAuth + Me + Logout
