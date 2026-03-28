@@ -147,10 +147,10 @@ const TARGETS = [
 ]
 
 const SIGNAL_TYPES = [
-  { value: "BUY", label: "🟢 ซื้อ", color: "var(--green)" },
-  { value: "STRONG_BUY", label: "💚 ซื้อแรง", color: "var(--green)" },
-  { value: "SELL", label: "🔴 ขาย", color: "var(--red)" },
-  { value: "STRONG_SELL", label: "❤️ ขายแรง", color: "var(--red)" },
+  { value: "BUY", label: "🟢 โมเมนตัมบวก", color: "var(--green)" },
+  { value: "STRONG_BUY", label: "💚 โมเมนตัมบวกแรง", color: "var(--green)" },
+  { value: "SELL", label: "🔴 โมเมนตัมลบ", color: "var(--red)" },
+  { value: "STRONG_SELL", label: "❤️ โมเมนตัมลบแรง", color: "var(--red)" },
   { value: "BREAKOUT", label: "🚀 Breakout", color: "var(--yellow)" },
   { value: "OVERSOLD", label: "🔵 Oversold", color: "var(--blue)" },
   { value: "OVERBOUGHT", label: "🟡 Overbought", color: "var(--yellow)" },

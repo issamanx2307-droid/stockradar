@@ -49,7 +49,7 @@ function ScoreBar({ score }: { score: number }) {
   const grade = s>=80?"ดีมาก":s>=60?"ดี":s>=40?"พอใช้":"อ่อน"
   return (
     <div style={{ display:"flex", alignItems:"center", gap:6 }}
-      title={`Score ${s} — ${grade}\n≥80 ดีมาก (STRONG BUY) | 60–79 ดี (BUY) | 40–59 พอใช้ (HOLD) | <40 อ่อน`}>
+      title={`Score ${s} — ${grade}\n≥80 ดีมาก (โมเมนตัมบวกแรง) | 60–79 ดี (โมเมนตัมบวก) | 40–59 พอใช้ (รอสัญญาณชัด) | <40 อ่อน`}>
       <div style={{ flex:1, height:5, background:"var(--border)", borderRadius:3 }}>
         <div style={{ width:`${s}%`, height:"100%", background:color, borderRadius:3 }} />
       </div>
@@ -68,9 +68,9 @@ function ScoreLegend() {
       borderTop:"none", fontSize:11, flexWrap:"wrap" }}>
       <span style={{ color:"var(--text-muted)", fontWeight:600 }}>Score:</span>
       {([
-        { range:"≥80", label:"ดีมาก — STRONG BUY", color:"#00c853" },
-        { range:"60–79", label:"ดี — BUY",          color:"var(--green)" },
-        { range:"40–59", label:"พอใช้ — HOLD",      color:"var(--yellow)" },
+        { range:"≥80", label:"ดีมาก — โมเมนตัมบวกแรง",  color:"#00c853" },
+        { range:"60–79", label:"ดี — โมเมนตัมบวก",     color:"var(--green)" },
+        { range:"40–59", label:"พอใช้ — รอสัญญาณชัด", color:"var(--yellow)" },
         { range:"<40",  label:"อ่อน — หลีกเลี่ยง",  color:"var(--red)" },
       ] as const).map(({ range, label, color }) => (
         <span key={range} style={{ display:"flex", alignItems:"center", gap:5 }}>

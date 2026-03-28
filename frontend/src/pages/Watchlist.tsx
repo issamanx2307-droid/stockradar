@@ -513,7 +513,7 @@ export default function Watchlist({ onOpenChart }: { onOpenChart?: (s: string) =
                                   border:`1px solid ${tf(item.item_id).action===a ? (a==="BUY"?"var(--green)":"var(--red)") : "var(--border)"}`,
                                   background: tf(item.item_id).action===a ? (a==="BUY"?"rgba(0,230,118,0.12)":"rgba(255,82,82,0.12)") : "transparent",
                                   color: tf(item.item_id).action===a ? (a==="BUY"?"var(--green)":"var(--red)") : "var(--text-muted)" }}>
-                                {a==="BUY"?"🟢 ซื้อ":"🔴 ขาย"}
+                                {a==="BUY"?"🟢 บันทึกซื้อ":"🔴 บันทึกขาย"}
                               </button>
                             ))}
                           </div>
