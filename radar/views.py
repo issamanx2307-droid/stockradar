@@ -1804,7 +1804,7 @@ def thai_indicators_api(request):
 # ─────────────────────────────────────────────────────────────────────────────
 
 @api_view(["GET"])
-@permission_classes([IsAuthenticated])
+@permission_classes([AllowAny])
 def vi_screen_api(request):
     """
     GET /api/vi-screen/

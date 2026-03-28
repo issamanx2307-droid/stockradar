@@ -199,10 +199,7 @@ export default function VIScreen({ onOpenChart }: { onOpenChart: (s: string) => 
     if (f.sort)      p.set("sort",      f.sort)
     p.set("page_size", "100")
 
-    const token = localStorage.getItem("token")
-    fetch(`${API_BASE}/vi-screen/?${p}`, {
-      headers: { Authorization: `Token ${token}` },
-    })
+    fetch(`${API_BASE}/vi-screen/?${p}`, {})
       .then(r => r.json())
       .then(d => setData(d))
       .catch(console.error)
