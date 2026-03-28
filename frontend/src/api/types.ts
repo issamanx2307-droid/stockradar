@@ -122,6 +122,8 @@ export interface TermQuestionTicket {
   status: "NEW" | "ANSWERED";
   answer_short: string;
   answer_full: string;
+  answered_at: string | null;
+  asked_by_username: string | null;
   created_at: string;
   updated_at: string;
 }

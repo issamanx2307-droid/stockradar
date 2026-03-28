@@ -4,6 +4,7 @@
 import { useState, useEffect } from "react"
 import { API_BASE } from "../api/config"
 import { useAuth } from "../context/AuthContext"
+import { TermQuestionTicket } from "../api/types"
 
 interface SystemStats {
   total_users: number
@@ -12,6 +13,144 @@ interface SystemStats {
   total_symbols: number
   total_prices: number
   last_signal_date: string | null
+}
+
+function QaPendingPanel({ token }: { token: string }) {
+  const [questions, setQuestions] = useState<TermQuestionTicket[]>([])
+  const [loadingQ, setLoadingQ] = useState(true)
+  const [answering, setAnswering] = useState<number | null>(null)
+  const [answerShort, setAnswerShort] = useState("")
+  const [answerFull, setAnswerFull] = useState("")
+  const [answerMsg, setAnswerMsg] = useState("")
+
+  function loadPending() {
+    setLoadingQ(true)
+    fetch(`${API_BASE}/qa/pending/`, { headers: { Authorization: `Token ${token}` } })
+      .then(r => r.json())
+      .then(d => { setQuestions(d.results || []); setLoadingQ(false) })
+      .catch(() => setLoadingQ(false))
+  }
+
+  useEffect(() => { loadPending() }, [token])
+
+  async function submitAnswer(id: number) {
+    if (!answerShort.trim()) return
+    setAnswerMsg("")
+    try {
+      const res = await fetch(`${API_BASE}/qa/answer/${id}/`, {
+        method: "PATCH",
+        headers: { Authorization: `Token ${token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ answer_short: answerShort, answer_full: answerFull }),
+      })
+      if (res.ok) {
+        setAnswerMsg("✅ ตอบสำเร็จ")
+        setAnswering(null); setAnswerShort(""); setAnswerFull("")
+        loadPending()
+      } else {
+        setAnswerMsg("❌ เกิดข้อผิดพลาด")
+      }
+    } catch {
+      setAnswerMsg("❌ ไม่สามารถเชื่อมต่อได้")
+    }
+  }
+
+  return (
+    <div style={{ marginTop: 32 }}>
+      <h2 style={{ fontSize: 16, fontWeight: 700, color: "#7a90a8", letterSpacing: 1, marginBottom: 16 }}>
+        📬 คำถามรอตอบ ({loadingQ ? "..." : questions.length})
+      </h2>
+      {answerMsg && (
+        <div style={{ marginBottom: 12, padding: "8px 14px", borderRadius: 8, fontSize: 13,
+          background: answerMsg.startsWith("✅") ? "rgba(0,230,118,.08)" : "rgba(255,82,82,.08)",
+          color: answerMsg.startsWith("✅") ? "#00e676" : "#ff5252",
+          border: `1px solid ${answerMsg.startsWith("✅") ? "rgba(0,230,118,.25)" : "rgba(255,82,82,.25)"}`,
+        }}>{answerMsg}</div>
+      )}
+      {loadingQ ? (
+        <div style={{ color: "#5a6e80", fontSize: 13 }}>กำลังโหลด...</div>
+      ) : questions.length === 0 ? (
+        <div style={{ color: "#5a6e80", fontSize: 13, padding: "16px 0" }}>✅ ไม่มีคำถามรอตอบ</div>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          {questions.map(q => (
+            <div key={q.id} style={{
+              padding: "14px 18px",
+              background: "rgba(255,255,255,.03)",
+              border: "1px solid rgba(255,255,255,.08)",
+              borderRadius: 10,
+            }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
+                <div>
+                  <div style={{ fontSize: 11, color: "#5a6e80", marginBottom: 4 }}>
+                    #{q.id} · {new Date(q.created_at).toLocaleString("th-TH")}
+                    {q.asked_by_username && <span> · 👤 {q.asked_by_username}</span>}
+                  </div>
+                  <div style={{ fontSize: 14, color: "#e2e8f0", fontWeight: 600 }}>❓ {q.question}</div>
+                </div>
+                {answering !== q.id && (
+                  <button
+                    onClick={() => { setAnswering(q.id); setAnswerShort(""); setAnswerFull(""); setAnswerMsg("") }}
+                    style={{
+                      padding: "6px 14px", borderRadius: 8, fontSize: 12, fontWeight: 700,
+                      background: "rgba(0,212,255,.12)", border: "1px solid rgba(0,212,255,.3)",
+                      color: "#00d4ff", cursor: "pointer", flexShrink: 0,
+                    }}>
+                    ✏️ ตอบ
+                  </button>
+                )}
+              </div>
+              {answering === q.id && (
+                <div style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 8 }}>
+                  <input
+                    placeholder="คำตอบสั้น (แสดงในแชท) *"
+                    value={answerShort}
+                    onChange={e => setAnswerShort(e.target.value)}
+                    style={{
+                      width: "100%", padding: "8px 12px", borderRadius: 7,
+                      background: "rgba(255,255,255,.05)", border: "1px solid rgba(255,255,255,.12)",
+                      color: "#e2e8f0", fontSize: 13,
+                    }}
+                  />
+                  <textarea
+                    placeholder="คำตอบเพิ่มเติม (ถ้ามี)"
+                    value={answerFull}
+                    onChange={e => setAnswerFull(e.target.value)}
+                    rows={3}
+                    style={{
+                      width: "100%", padding: "8px 12px", borderRadius: 7,
+                      background: "rgba(255,255,255,.05)", border: "1px solid rgba(255,255,255,.12)",
+                      color: "#e2e8f0", fontSize: 13, resize: "vertical",
+                    }}
+                  />
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <button
+                      onClick={() => submitAnswer(q.id)}
+                      disabled={!answerShort.trim()}
+                      style={{
+                        padding: "7px 18px", borderRadius: 7, fontSize: 13, fontWeight: 700,
+                        background: "rgba(0,230,118,.15)", border: "1px solid rgba(0,230,118,.3)",
+                        color: "#00e676", cursor: "pointer",
+                      }}>
+                      ส่งคำตอบ
+                    </button>
+                    <button
+                      onClick={() => setAnswering(null)}
+                      style={{
+                        padding: "7px 14px", borderRadius: 7, fontSize: 13,
+                        background: "transparent", border: "1px solid rgba(255,255,255,.1)",
+                        color: "#5a6e80", cursor: "pointer",
+                      }}>
+                      ยกเลิก
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
 }
 
 export default function AdminPanel() {
@@ -160,6 +299,8 @@ export default function AdminPanel() {
           สัญญาณล่าสุด: {new Date(stats.last_signal_date).toLocaleString("th-TH")}
         </div>
       )}
+
+      {token && <QaPendingPanel token={token} />}
     </div>
   )
 }

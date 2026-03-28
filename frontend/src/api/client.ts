@@ -15,7 +15,7 @@ import {
 const BASE_URL = API_BASE
 
 function getAuthHeader() {
-  const token = localStorage.getItem("token")
+  const token = localStorage.getItem("sr_token")
   return token ? { Authorization: `Token ${token}` } : {}
 }
 
@@ -52,6 +52,15 @@ export const api = {
     apiFetch("/qa/ask/", {
       method: "POST",
       body: JSON.stringify({ question }),
+    }),
+  getMyQuestions: (): Promise<{ results: TermQuestionTicket[] }> =>
+    apiFetch("/qa/my-questions/"),
+  getPendingQuestions: (): Promise<{ results: TermQuestionTicket[] }> =>
+    apiFetch("/qa/pending/"),
+  answerQuestion: (id: number, answer_short: string, answer_full: string): Promise<{ ok: boolean; ticket: TermQuestionTicket }> =>
+    apiFetch(`/qa/answer/${id}/`, {
+      method: "PATCH",
+      body: JSON.stringify({ answer_short, answer_full }),
     }),
   updateProfile: (data: Partial<UserInfo["profile"]>): Promise<UserInfo> =>
     apiFetch("/profile/", {

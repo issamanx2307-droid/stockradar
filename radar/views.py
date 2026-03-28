@@ -147,6 +147,49 @@ def qa_ask(request):
     }, status=202)
 
 
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def qa_my_questions(request):
+    """คำถามของผู้ใช้ที่ล็อกอินอยู่ (รวมคำตอบจาก admin ถ้ามี)"""
+    qs = TermQuestion.objects.filter(asked_by=request.user).order_by("-created_at")[:50]
+    return Response({"results": TermQuestionSerializer(qs, many=True).data})
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def qa_pending(request):
+    """รายการคำถามที่รอตอบ — admin only"""
+    if not (request.user.is_staff or request.user.is_superuser):
+        return Response({"error": "Permission denied"}, status=403)
+    qs = TermQuestion.objects.filter(status="NEW").order_by("-created_at")[:100]
+    return Response({"results": TermQuestionSerializer(qs, many=True).data})
+
+
+@api_view(["PATCH"])
+@permission_classes([IsAuthenticated])
+def qa_answer(request, question_id):
+    """admin ตอบคำถาม"""
+    if not (request.user.is_staff or request.user.is_superuser):
+        return Response({"error": "Permission denied"}, status=403)
+    try:
+        q_obj = TermQuestion.objects.get(id=question_id)
+    except TermQuestion.DoesNotExist:
+        return Response({"error": "ไม่พบคำถาม"}, status=404)
+
+    answer_short = request.data.get("answer_short", "").strip()
+    answer_full = request.data.get("answer_full", "").strip()
+    if not answer_short:
+        return Response({"error": "กรุณาใส่คำตอบ"}, status=400)
+
+    q_obj.answer_short = answer_short
+    q_obj.answer_full = answer_full
+    q_obj.status = "ANSWERED"
+    q_obj.answered_by = request.user
+    q_obj.answered_at = timezone.now()
+    q_obj.save()
+    return Response({"ok": True, "ticket": TermQuestionSerializer(q_obj).data})
+
+
 @api_view(["POST"])
 def position_analyze_api(request):
     serializer = PositionAnalyzeRequestSerializer(data=request.data)

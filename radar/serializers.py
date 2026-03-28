@@ -87,6 +87,8 @@ class StockTermSerializer(serializers.ModelSerializer):
 
 
 class TermQuestionSerializer(serializers.ModelSerializer):
+    asked_by_username = serializers.SerializerMethodField()
+
     class Meta:
         model = TermQuestion
         fields = [
@@ -96,9 +98,14 @@ class TermQuestionSerializer(serializers.ModelSerializer):
             "status",
             "answer_short",
             "answer_full",
+            "answered_at",
+            "asked_by_username",
             "created_at",
             "updated_at",
         ]
+
+    def get_asked_by_username(self, obj):
+        return obj.asked_by.username if obj.asked_by else None
 
 
 class TermQuestionCreateSerializer(serializers.Serializer):

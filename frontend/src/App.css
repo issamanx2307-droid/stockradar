@@ -800,7 +800,7 @@ body {
   display: grid;
   grid-template-columns: 1fr 90px;
   gap: 10px;
-  padding-top: 12px;
+  padding-bottom: 12px;
 }
 
 /* ── Scrollbar ── */

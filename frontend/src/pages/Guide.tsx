@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import { GUIDE_DATA, GuideItem } from "../data/guideData"
 import { api } from "../api/client"
-import { StockTermInfo } from "../api/types"
+import { StockTermInfo, TermQuestionTicket } from "../api/types"
 import { AiTerm, TermText } from "../components/TermAssistant"
 
 // ── Tab button style ──────────────────────────────────────────────────────────
@@ -91,6 +91,14 @@ function QnaTab() {
       </aside>
 
       <section className="card qna-main">
+        <div className="qna-input">
+          <input className="input-field" value={query}
+            onChange={e => setQuery(e.target.value)}
+            placeholder="พิมพ์ศัพท์หรือคำถาม แล้วกด Enter…"
+            onKeyDown={e => { if (e.key === "Enter") send() }}
+            disabled={busy} autoFocus />
+          <button className="btn btn-primary" onClick={send} disabled={!canSend}>ส่ง</button>
+        </div>
         <div className="qna-messages">
           {messages.map(m => (
             <div key={m.id} className={`qna-msg ${m.role}`}>
@@ -107,15 +115,78 @@ function QnaTab() {
           ))}
           <div ref={bottomRef} />
         </div>
-        <div className="qna-input">
-          <input className="input-field" value={query}
-            onChange={e => setQuery(e.target.value)}
-            placeholder="พิมพ์ศัพท์หรือคำถาม แล้วกด Enter…"
-            onKeyDown={e => { if (e.key === "Enter") send() }}
-            disabled={busy} />
-          <button className="btn btn-primary" onClick={send} disabled={!canSend}>ส่ง</button>
-        </div>
       </section>
+    </div>
+  )
+}
+
+// ── My Questions Tab ──────────────────────────────────────────────────────────
+function MyQuestionsTab() {
+  const [questions, setQuestions] = useState<TermQuestionTicket[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState("")
+
+  useEffect(() => {
+    api.getMyQuestions()
+      .then(r => { setQuestions(r.results); setLoading(false) })
+      .catch(() => { setError("ไม่สามารถโหลดคำถามได้ กรุณาล็อกอินก่อน"); setLoading(false) })
+  }, [])
+
+  if (loading) return <div style={{ padding: 32, color: "var(--text-muted)", textAlign: "center" }}>⏳ กำลังโหลด...</div>
+  if (error) return <div style={{ padding: 32, color: "#ff5252", textAlign: "center" }}>{error}</div>
+  if (questions.length === 0) return (
+    <div style={{ padding: 32, color: "var(--text-muted)", textAlign: "center" }}>
+      <div style={{ fontSize: 32, marginBottom: 8 }}>📭</div>
+      <div>ยังไม่มีคำถาม — ไปถามในแท็บ "ถาม-ตอบศัพท์เทคนิค" ได้เลย</div>
+    </div>
+  )
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+      {questions.map(q => (
+        <div key={q.id} className="card" style={{ padding: "16px 20px" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+            <span style={{
+              fontSize: 11, fontWeight: 700, padding: "2px 8px", borderRadius: 20,
+              background: q.status === "ANSWERED" ? "rgba(0,230,118,.15)" : "rgba(255,215,0,.12)",
+              color: q.status === "ANSWERED" ? "#00e676" : "#FFD700",
+              border: `1px solid ${q.status === "ANSWERED" ? "rgba(0,230,118,.3)" : "rgba(255,215,0,.3)"}`,
+            }}>
+              {q.status === "ANSWERED" ? "✅ ตอบแล้ว" : "🕐 รอคำตอบ"}
+            </span>
+            <span style={{ fontSize: 11, color: "var(--text-muted)" }}>
+              {new Date(q.created_at).toLocaleString("th-TH")}
+            </span>
+          </div>
+          <div style={{ fontSize: 14, color: "var(--text-primary)", fontWeight: 600, marginBottom: q.status === "ANSWERED" ? 10 : 0 }}>
+            ❓ {q.question}
+          </div>
+          {q.status === "ANSWERED" && q.answer_short && (
+            <div style={{
+              marginTop: 8, padding: "12px 14px",
+              background: "rgba(0,230,118,.06)", borderRadius: 8,
+              borderLeft: "3px solid #00e676",
+            }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: "#00e676", marginBottom: 4 }}>
+                💬 คำตอบจาก Admin
+              </div>
+              <div style={{ fontSize: 14, color: "var(--text-primary)", lineHeight: 1.7 }}>
+                {q.answer_short}
+              </div>
+              {q.answer_full && (
+                <div style={{ fontSize: 13, color: "var(--text-secondary)", lineHeight: 1.7, marginTop: 6 }}>
+                  {q.answer_full}
+                </div>
+              )}
+              {q.answered_at && (
+                <div style={{ fontSize: 11, color: "var(--text-muted)", marginTop: 6 }}>
+                  ตอบเมื่อ {new Date(q.answered_at).toLocaleString("th-TH")}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      ))}
     </div>
   )
 }
@@ -664,7 +735,7 @@ function MenuGuideTab() {
 
 // ── Main Combined Page ────────────────────────────────────────────────────────
 export default function Guide() {
-  const [tab, setTab] = useState<"guide" | "qna" | "menu">("guide")
+  const [tab, setTab] = useState<"guide" | "qna" | "myq" | "menu">("guide")
 
   return (
     <div className="fade-up">
@@ -675,12 +746,15 @@ export default function Guide() {
       <div className="page-body">
 
         {/* Tab nav */}
-        <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
+        <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
           <button style={tabStyle(tab === "guide")} onClick={() => setTab("guide")}>
             💡 คำแนะนำ Indicator
           </button>
           <button style={tabStyle(tab === "qna")} onClick={() => setTab("qna")}>
             💬 ถาม-ตอบศัพท์เทคนิค
+          </button>
+          <button style={tabStyle(tab === "myq")} onClick={() => setTab("myq")}>
+            📬 คำถามของฉัน
           </button>
           <button style={tabStyle(tab === "menu")} onClick={() => setTab("menu")}>
             🗺️ คู่มือเมนู
@@ -689,6 +763,7 @@ export default function Guide() {
 
         {tab === "guide" && <GuideTab />}
         {tab === "qna"   && <QnaTab />}
+        {tab === "myq"   && <MyQuestionsTab />}
         {tab === "menu"  && <MenuGuideTab />}
 
       </div>
