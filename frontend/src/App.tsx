@@ -18,7 +18,6 @@ import EngineScan from "./pages/EngineScan"
 import Portfolio from "./pages/Portfolio"
 import EngineBacktest from "./pages/EngineBacktest"
 import Watchlist from "./pages/Watchlist"
-import Subscription from "./pages/Subscription"
 import Fundamental from "./pages/Fundamental"
 import AdminPanel from "./pages/AdminPanel"
 import { AutoTermHighlight, TermAssistantProvider, TermAssistantToggle } from "./components/TermAssistant"
@@ -39,8 +38,7 @@ const USER_NAV: { id: string; label: string; icon: string }[] = [
   { id: "strategy",     label: "กลยุทธ์",             icon: "🎯" },
   { id: "backtest",     label: "Backtest",            icon: "⏪" },
   { id: "guide",        label: "คำแนะนำ & ถาม-ตอบ",  icon: "💡" },
-  { id: "subscription", label: "สมาชิก",             icon: "💳" },
-  { id: "profile",      label: "โปรไฟล์ / ตั้งค่า",  icon: "⚙️" },
+  { id: "profile",      label: "บัญชี & สมาชิก",     icon: "⚙️" },
   { id: "contact",      label: "ติดต่อเรา",          icon: "📞" },
 ]
 
@@ -152,7 +150,6 @@ function AppInner() {
             {page === "strategy"     && <StrategyBuilder />}
             {page === "backtest"     && <EngineBacktest onOpenChart={openChart} />}
             {page === "guide"        && <Guide />}
-            {page === "subscription" && <Subscription />}
             {page === "profile"      && <Profile />}
             {page === "contact"      && <Contact />}
           </AutoTermHighlight>
