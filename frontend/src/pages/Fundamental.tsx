@@ -4,8 +4,9 @@
  */
 import { useState, useCallback } from "react"
 import SymbolInput from "../components/SymbolInput"
+import { API_BASE } from "../api/config"
 
-const BASE = "http://127.0.0.1:8000/api"
+const BASE = API_BASE
 
 type FundData = {
   symbol: string; ticker: string; name: string; sector: string; industry: string
