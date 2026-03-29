@@ -1,5 +1,5 @@
 /**
- * pages/EngineScan.tsx — Top Opportunities
+ * pages/EngineScan.tsx — ตัวอย่างผลสแกนที่เข้าเกณฑ์
  * แก้ไข: decision key mismatch (STRONG_BUY vs "STRONG BUY"), default score/days, symbol search autocomplete
  */
 import { useState, useEffect, useRef } from "react"
@@ -258,7 +258,7 @@ export default function EngineScan({ onOpenChart }: { onOpenChart?: (s: string) 
   return (
     <div className="fade-up">
       <div className="page-header">
-        <div className="page-title">🔥 Top Opportunities</div>
+        <div className="page-title">🔥 ตัวอย่างผลสแกนที่เข้าเกณฑ์</div>
         <div className="page-subtitle">5-Factor Scoring Engine · คลิกหุ้นเพื่อดู Full Analysis</div>
       </div>
       <div className="page-body">

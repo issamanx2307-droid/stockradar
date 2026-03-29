@@ -79,7 +79,7 @@ export default function LoginPage() {
         <div style={{ marginBottom: 36, textAlign: "left" }}>
           {[
             "📡 สัญญาณซื้อขายจาก 5-Factor Engine",
-            "🔥 Top Opportunities ทุกวัน",
+            "🔥 ตัวอย่างผลสแกนที่เข้าเกณฑ์ทุกวัน",
             "⭐ Watchlist + ติดตามพอร์ต",
             "📊 Fundamental Data + Economic Calendar",
           ].map((f, i) => (

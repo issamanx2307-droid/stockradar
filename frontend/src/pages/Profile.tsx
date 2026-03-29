@@ -194,7 +194,7 @@ function SubscriptionTab() {
               {[
                 { label: "Watchlist",         key: "watchlist_limit",     fmt: (v: any) => v === -1 ? "ไม่จำกัด" : `${v} หุ้น` },
                 { label: "สัญญาณย้อนหลัง",   key: "signal_days",         fmt: (v: any) => `${v} วัน` },
-                { label: "Top Opportunities", key: "engine_scan_top",     fmt: (v: any) => v === -1 ? "ไม่จำกัด" : `Top ${v}` },
+                { label: "ผลสแกนที่เข้าเกณฑ์", key: "engine_scan_top",     fmt: (v: any) => v === -1 ? "ไม่จำกัด" : `Top ${v}` },
                 { label: "Fundamental/วัน",   key: "fundamental_per_day", fmt: (v: any) => v === -1 ? "ไม่จำกัด" : `${v} ครั้ง` },
                 { label: "Backtest Engine",   key: "backtest",            fmt: (v: any) => v ? "✅" : "❌" },
                 { label: "Portfolio Engine",  key: "portfolio_engine",    fmt: (v: any) => v ? "✅" : "❌" },

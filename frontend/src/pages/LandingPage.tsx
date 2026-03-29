@@ -396,7 +396,7 @@ export default function LandingPage() {
           display: "flex", alignItems: "center", gap: 48,
         }}>
 
-          {/* ── LEFT: TOP OPPORTUNITIES CARD ── */}
+          {/* ── LEFT: ผลสแกนที่เข้าเกณฑ์ CARD ── */}
           <div className="lp-hero-card lp-fade" style={{
             flexShrink: 0, width: 400,
             animation: "heroFloat 5s ease-in-out infinite",
@@ -422,7 +422,7 @@ export default function LandingPage() {
                     animation: "blinkDot 1.2s ease-in-out infinite",
                   }} />
                   <span style={{ fontSize: 12, fontWeight: 800, color: "#e2e8f0", letterSpacing: 1 }}>
-                    TOP OPPORTUNITIES
+                    ผลสแกนที่เข้าเกณฑ์
                   </span>
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
@@ -580,7 +580,7 @@ export default function LandingPage() {
             <div className="lp-fade lp-fade-delay-2" style={{
               display: "flex", flexWrap: "wrap", gap: 10, marginBottom: 40,
             }}>
-              {["📡 เครื่องมือ Indicator", "🔥 Top Opportunities", "📊 Backtest", "💼 Portfolio", "📰 ข่าว & Sentiment"].map(f => (
+              {["📡 เครื่องมือ Indicator", "🔥 ตัวอย่างผลสแกนที่เข้าเกณฑ์", "📊 Backtest", "💼 Portfolio", "📰 ข่าว & Sentiment"].map(f => (
                 <span key={f} style={{
                   padding: "7px 16px", borderRadius: 20,
                   background: "rgba(255,255,255,.05)",
@@ -657,7 +657,7 @@ export default function LandingPage() {
             />
             <FeatureCard
               icon="🔥"
-              title="Top Opportunities"
+              title="ตัวอย่างผลสแกนที่เข้าเกณฑ์"
               desc="สแกนหาหุ้นที่ตรงเกณฑ์เทคนิคมากที่สุดประจำวัน คัดกรองจากกว่า 10,000 หุ้นทั่วโลก"
             />
             <FeatureCard
@@ -837,7 +837,7 @@ export default function LandingPage() {
               btnId="google-btn-free"
               features={[
                 "Watchlist 3 ตัวหุ้น",
-                "Top Opportunities 20 อันดับ",
+                "ตัวอย่างผลสแกนที่เข้าเกณฑ์ 20 อันดับ",
                 "Backtest ย้อนหลัง 1 ปี",
                 "Indicator พื้นฐาน",
                 "ข่าวตลาด & Sentiment",
@@ -852,7 +852,7 @@ export default function LandingPage() {
               highlight
               features={[
                 "Watchlist 10 ตัวหุ้น",
-                "Top Opportunities 100 อันดับ",
+                "ตัวอย่างผลสแกนที่เข้าเกณฑ์ 100 อันดับ",
                 "Backtest ย้อนหลัง 3 ปี",
                 "Fundamental Data ครบถ้วน",
                 "ปฏิทินเศรษฐกิจ",
@@ -867,7 +867,7 @@ export default function LandingPage() {
               btnId="google-btn-premium"
               features={[
                 "Watchlist 20 ตัวหุ้น",
-                "Top Opportunities 500 อันดับ",
+                "ตัวอย่างผลสแกนที่เข้าเกณฑ์ 500 อันดับ",
                 "Backtest ย้อนหลัง 5 ปี",
                 "ทุกฟีเจอร์ไม่จำกัด",
                 "Line / Telegram Alerts",
@@ -952,7 +952,7 @@ export default function LandingPage() {
                 <div style={{ fontSize: 12, fontWeight: 700, color: "#4a5a70", letterSpacing: 1, marginBottom: 12 }}>
                   ผลิตภัณฑ์
                 </div>
-                {["ฟีเจอร์", "ราคา", "Backtest", "Top Opportunities"].map(l => (
+                {["ฟีเจอร์", "ราคา", "Backtest", "ตัวอย่างผลสแกนที่เข้าเกณฑ์"].map(l => (
                   <div key={l} style={{ marginBottom: 8 }}>
                     <span style={{ fontSize: 13, color: "#3a4a58", cursor: "pointer" }}>{l}</span>
                   </div>

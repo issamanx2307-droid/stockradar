@@ -148,7 +148,7 @@ const MENU_GUIDE: MenuItem[] = [
     ],
   },
   {
-    id: "engine_scan", icon: "🔥", label: "Top Opportunities", color: "#ff6d00",
+    id: "engine_scan", icon: "🔥", label: "ตัวอย่างผลสแกนที่เข้าเกณฑ์", color: "#ff6d00",
     purpose: "ค้นหาหุ้นที่ดีที่สุดในขณะนี้โดยใช้ระบบคะแนน 5 ปัจจัย (5-Factor Scoring Engine) — ไม่ใช่แค่สัญญาณ แต่จัดอันดับว่าหุ้นไหนผ่านมากที่สุดในด้าน Trend, Momentum, Volume, Volatility และ Risk",
     howBuilt: [
       "Engine ที่ /engine/scan/ ประมวลผลหุ้นทุกตัวตามช่วงเวลาที่เลือก คำนวณ Score 0–100",

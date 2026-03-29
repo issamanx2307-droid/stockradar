@@ -28,7 +28,7 @@ import "./App.css"
 // ── เมนูสำหรับ User ทั่วไป ───────────────────────────────────────────────────
 const USER_NAV: { id: string; label: string; icon: string }[] = [
   { id: "dashboard",    label: "ราดาร์",            icon: "📡" },
-  { id: "engine_scan",  label: "Top Opportunities",  icon: "🔥" },
+  { id: "engine_scan",  label: "ตัวอย่างผลสแกนที่เข้าเกณฑ์",  icon: "🔥" },
   { id: "watchlist",    label: "Watchlist",           icon: "⭐" },
   { id: "news",         label: "ข่าว & Sentiment",   icon: "📰" },
   { id: "analyze",      label: "วิเคราะห์หุ้น",     icon: "🔬" },
