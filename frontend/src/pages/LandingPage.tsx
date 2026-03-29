@@ -230,6 +230,22 @@ export default function LandingPage() {
 
   const noGoogleId = !GOOGLE_CLIENT_ID
 
+  const warningBanner = (
+    <div style={{
+      background: "rgba(255,183,0,.08)",
+      border: "1px solid rgba(255,183,0,.35)",
+      borderLeft: "4px solid #ffb700",
+      padding: "18px 24px",
+      textAlign: "center",
+    }}>
+      <div style={{ maxWidth: 860, margin: "0 auto", fontSize: 16, fontWeight: 600, color: "#ffd54f", lineHeight: 1.9 }}>
+        ⚠️ <strong>คำเตือน:</strong> แพลตฟอร์มนี้เป็นเครื่องมือวิเคราะห์ข้อมูลเชิงสถิติ ตามหลักการตามที่เป็นที่ทราบกันโดยทั่วไป
+        <br />ไม่ถือเป็นคำแนะนำการลงทุน การซื้อขายหลักทรัพย์มีความเสี่ยง
+        <br />ผู้ใช้งานควรศึกษาข้อมูลและตัดสินใจด้วยตนเอง
+      </div>
+    </div>
+  )
+
   return (
     <div style={{ fontFamily: "'IBM Plex Sans Thai', sans-serif", background: "#080d18", color: "#e2e8f0", minHeight: "100vh" }}>
 
@@ -298,9 +314,12 @@ export default function LandingPage() {
         }
       `}</style>
 
+      {/* ── WARNING BANNER TOP ──────────────────────────────────────── */}
+      {warningBanner}
+
       {/* ── NAVBAR ─────────────────────────────────────────────────── */}
       <nav style={{
-        position: "fixed", top: 0, left: 0, right: 0, zIndex: 999,
+        position: "sticky", top: 0, left: 0, right: 0, zIndex: 999,
         background: "rgba(8,13,24,.85)", backdropFilter: "blur(12px)",
         borderBottom: "1px solid rgba(255,255,255,.07)",
         padding: "0 24px", height: 62,
@@ -357,7 +376,7 @@ export default function LandingPage() {
       <section ref={heroRef} style={{
         position: "relative", overflow: "hidden",
         minHeight: "100vh", display: "flex", alignItems: "center",
-        paddingTop: 62,
+        paddingTop: 0,
       }}>
         {/* Background glows */}
         <div className="hero-glow" style={{ width: 600, height: 600, top: -100, left: -150 }} />
@@ -529,7 +548,7 @@ export default function LandingPage() {
               fontSize: 13, color: "#00d4ff",
             }}>
               <span style={{ animation: "blinkDot 1.5s ease-in-out infinite", fontSize: 8 }}>●</span>
-              ระบบวิเคราะห์หุ้น AI — อัปเดตทุกวัน
+              แพลตฟอร์มเครื่องมือ Indicator ครบวงจร — อัปเดตทุกวัน
             </div>
 
             {/* Headline */}
@@ -537,15 +556,15 @@ export default function LandingPage() {
               fontSize: 52, fontWeight: 800, lineHeight: 1.2,
               margin: "0 0 20px", letterSpacing: -1.5,
             }}>
-              วิเคราะห์หุ้นอย่าง{" "}
+              ค้นหาหุ้นที่น่าสนใจ{" "}
               <span style={{
                 color: "transparent",
                 backgroundImage: "linear-gradient(135deg, #00d4ff, #00e676)",
                 WebkitBackgroundClip: "text", backgroundClip: "text",
               }}>
-                มืออาชีพ
+                ด้วยเครื่องมือ
               </span>
-              <br />ด้วย AI-Powered Engine
+              <br />Indicator ครบวงจร
             </h1>
 
             {/* Subheadline */}
@@ -554,14 +573,14 @@ export default function LandingPage() {
               margin: "0 0 32px",
             }}>
               สแกนกว่า <strong style={{ color: "#e2e8f0" }}>10,000+ หุ้น</strong> ทั่วโลก — ตลาดหุ้นไทย (SET) และ US Market
-              พร้อมสัญญาณซื้อขายจาก <strong style={{ color: "#e2e8f0" }}>5-Factor Engine</strong> และข้อมูล Fundamental แบบเรียลไทม์
+              พร้อม Indicator จาก <strong style={{ color: "#e2e8f0" }}>5-Factor Engine</strong> และข้อมูล Fundamental แบบเรียลไทม์
             </p>
 
             {/* Feature pills */}
             <div className="lp-fade lp-fade-delay-2" style={{
               display: "flex", flexWrap: "wrap", gap: 10, marginBottom: 40,
             }}>
-              {["📡 สัญญาณซื้อขาย", "🔥 Top Opportunities", "📊 Backtest", "💼 Portfolio", "📰 ข่าว & Sentiment"].map(f => (
+              {["📡 เครื่องมือ Indicator", "🔥 Top Opportunities", "📊 Backtest", "💼 Portfolio", "📰 ข่าว & Sentiment"].map(f => (
                 <span key={f} style={{
                   padding: "7px 16px", borderRadius: 20,
                   background: "rgba(255,255,255,.05)",
@@ -633,13 +652,13 @@ export default function LandingPage() {
           }}>
             <FeatureCard
               icon="📡"
-              title="สัญญาณซื้อขาย AI"
-              desc="5-Factor Engine วิเคราะห์ EMA, RSI, MACD, Bollinger Bands, ADX พร้อม Stop Loss อัตโนมัติ"
+              title="Indicator Dashboard"
+              desc="5-Factor Engine วิเคราะห์ EMA, RSI, MACD, Bollinger Bands, ADX แสดงผลเชิงสถิติแบบครบวงจร"
             />
             <FeatureCard
               icon="🔥"
               title="Top Opportunities"
-              desc="สแกนหาโอกาสซื้อขายดีที่สุดประจำวัน คัดกรองจากกว่า 10,000 หุ้นทั่วโลก"
+              desc="สแกนหาหุ้นที่ตรงเกณฑ์เทคนิคมากที่สุดประจำวัน คัดกรองจากกว่า 10,000 หุ้นทั่วโลก"
             />
             <FeatureCard
               icon="⏪"
@@ -678,7 +697,7 @@ export default function LandingPage() {
             {[
               { num: "01", title: "สมัครฟรี", desc: "Login ด้วย Google Account ไม่ต้องกรอกข้อมูลเพิ่ม พร้อมใช้ทันที", color: "#00d4ff" },
               { num: "02", title: "เลือกหุ้นที่สนใจ", desc: "เพิ่มหุ้นใน Watchlist หรือใช้ Scanner ค้นหาโอกาสที่เหมาะสม", color: "#00e676" },
-              { num: "03", title: "รับสัญญาณอัตโนมัติ", desc: "ระบบ AI วิเคราะห์และส่งสัญญาณซื้อขายพร้อม Stop Loss ทุกวัน", color: "#ffd740" },
+              { num: "03", title: "ดูผลการวิเคราะห์", desc: "ระบบ AI คำนวณ Indicator และแสดงผลข้อมูลเชิงสถิติให้คุณทุกวัน", color: "#ffd740" },
             ].map((s, i) => (
               <div key={i} className={`lp-fade lp-fade-delay-${i + 1}`} style={{ textAlign: "center", padding: "8px 16px" }}>
                 <div style={{
@@ -705,7 +724,7 @@ export default function LandingPage() {
               <div style={{ fontSize: 13, color: "#00d4ff", fontWeight: 700, letterSpacing: 2, marginBottom: 8 }}>
                 SIGNAL STATS
               </div>
-              <h2 style={{ fontSize: 28, fontWeight: 800, margin: 0 }}>สัญญาณล่าสุดจากระบบ</h2>
+              <h2 style={{ fontSize: 28, fontWeight: 800, margin: 0 }}>ผลการวิเคราะห์ล่าสุดจากระบบ</h2>
             </div>
             <div style={{
               display: "grid",
@@ -820,7 +839,7 @@ export default function LandingPage() {
                 "Watchlist 3 ตัวหุ้น",
                 "Top Opportunities 20 อันดับ",
                 "Backtest ย้อนหลัง 1 ปี",
-                "สัญญาณซื้อขายพื้นฐาน",
+                "Indicator พื้นฐาน",
                 "ข่าวตลาด & Sentiment",
               ]}
             />
@@ -837,7 +856,7 @@ export default function LandingPage() {
                 "Backtest ย้อนหลัง 3 ปี",
                 "Fundamental Data ครบถ้วน",
                 "ปฏิทินเศรษฐกิจ",
-                "สัญญาณ Advanced ทั้งหมด",
+                "Indicator Advanced ทั้งหมด",
               ]}
             />
             <PlanCard
@@ -963,6 +982,9 @@ export default function LandingPage() {
           </div>
         </div>
       </footer>
+
+      {/* ── WARNING BANNER BOTTOM ───────────────────────────────────── */}
+      {warningBanner}
 
       {/* ── TICKER TAPE (ดัชนีวิ่งด้านล่าง) ────────────────────────── */}
       <TickerTape />
