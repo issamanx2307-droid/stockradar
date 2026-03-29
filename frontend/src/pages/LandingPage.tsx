@@ -959,9 +959,19 @@ export default function LandingPage() {
                 <div style={{ fontSize: 12, fontWeight: 700, color: "#4a5a70", letterSpacing: 1, marginBottom: 12 }}>
                   ช่วยเหลือ
                 </div>
-                {["คำแนะนำการใช้งาน", "ถาม-ตอบ", "ติดต่อเรา", "Terms of Service"].map(l => (
-                  <div key={l} style={{ marginBottom: 8 }}>
-                    <span style={{ fontSize: 13, color: "#3a4a58", cursor: "pointer" }}>{l}</span>
+                {[
+                  { label: "คำแนะนำการใช้งาน", href: null },
+                  { label: "ถาม-ตอบ", href: null },
+                  { label: "ติดต่อเรา", href: null },
+                  { label: "Privacy Policy", href: "/privacy-policy" },
+                  { label: "Terms of Service", href: "/terms-and-conditions" },
+                ].map(({ label, href }) => (
+                  <div key={label} style={{ marginBottom: 8 }}>
+                    {href ? (
+                      <a href={href} style={{ fontSize: 13, color: "#3a4a58", textDecoration: "none" }}>{label}</a>
+                    ) : (
+                      <span style={{ fontSize: 13, color: "#3a4a58", cursor: "pointer" }}>{label}</span>
+                    )}
                   </div>
                 ))}
               </div>
