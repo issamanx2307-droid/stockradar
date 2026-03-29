@@ -721,10 +721,7 @@ export default function LandingPage() {
         <section style={{ padding: "60px 0", borderTop: "1px solid rgba(255,255,255,.05)" }}>
           <div className="lp-container">
             <div style={{ marginBottom: 32 }}>
-              <div style={{ fontSize: 13, color: "#00d4ff", fontWeight: 700, letterSpacing: 2, marginBottom: 8 }}>
-                SIGNAL STATS
-              </div>
-              <h2 style={{ fontSize: 28, fontWeight: 800, margin: 0 }}>ผลการวิเคราะห์ล่าสุดจากระบบ</h2>
+              <h2 style={{ fontSize: 28, fontWeight: 800, margin: 0 }}>ตัวอย่างผลสแกนที่เข้าเกณฑ์</h2>
             </div>
             <div style={{
               display: "grid",
