@@ -24,9 +24,10 @@ import requests
 VPS_API_URL   = os.environ.get("VPS_API_URL", "").strip().rstrip("/")
 VPS_API_TOKEN = os.environ.get("VPS_API_TOKEN", "").strip()
 
-BATCH_SIZE   = 200
-SLEEP_TICKER = 0.3
-MAX_RETRIES  = 3
+BATCH_SIZE        = 200
+SLEEP_TICKER      = 0.3   # delay หลังแต่ละ ticker (Stooq)
+SLEEP_YAHOO       = 0.8   # delay หลัง Yahoo Finance call (ป้องกัน rate limit)
+MAX_RETRIES       = 3
 
 
 def get_symbols() -> list[dict]:
@@ -181,6 +182,7 @@ def main():
         if is_us:
             # US stocks: ใช้ Yahoo Finance ตรงๆ (Stooq มักบล็อก GitHub Actions)
             rows = fetch_ticker_yahoo(symbol, yahoo, start, end)
+            time.sleep(SLEEP_YAHOO)
             if rows:
                 yahoo_direct += 1
             else:
@@ -191,6 +193,7 @@ def main():
             rows = fetch_ticker_stooq(stooq_ticker, start, end)
             if not rows:
                 rows = fetch_ticker_yahoo(symbol, yahoo, start, end)
+                time.sleep(SLEEP_YAHOO)
                 if rows:
                     yahoo_fallback += 1
 
