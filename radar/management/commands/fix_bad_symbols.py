@@ -1,51 +1,56 @@
 """
-fix_bad_symbols — แก้ไข ticker ผิด และลบหุ้น delisted ออกจาก DB
+fix_bad_symbols — แก้ไข symbol/exchange ผิด และลบหุ้น delisted ออกจาก DB
 
 การใช้งาน:
     python manage.py fix_bad_symbols          # preview (ไม่แก้จริง)
     python manage.py fix_bad_symbols --apply  # แก้จริง
+
+หมายเหตุ: yahoo ticker ถูก compute อัตโนมัติใน symbols_export view:
+    - SET exchange  → yahoo = symbol + ".BK"
+    - ไม่ใช่ SET    → yahoo = symbol
+  ดังนั้นต้องแก้ที่ symbol/exchange โดยตรง
 """
 
 from django.core.management.base import BaseCommand
 from radar.models import Symbol, PriceDaily
 
 
-# ── ticker ที่ต้องแก้ yahoo field ──────────────────────────────────────────
-TICKER_FIXES = [
-    # symbol,    new_yahoo,   reason
-    ("MAKRO",    "CPAXT.BK",  "renamed to CP Axtra (CPAXT)"),
-    ("INDORAMA", "IVL.BK",    "SET ticker is IVL, not INDORAMA"),
-    ("PS",       "PSH.BK",    "Pruksa renamed to PSH"),
-    ("SHREIT",   "SHR.BK",    "REIT renamed to SHR"),
-    ("BRK.B",    "BRK-B",     "yfinance uses hyphen, not dot"),
+# ── เปลี่ยนชื่อ symbol (SET: yahoo=symbol.BK จะตามไปเอง) ──────────────────
+# (old_symbol, new_symbol, reason)
+SYMBOL_RENAMES = [
+    ("MAKRO",    "CPAXT",  "renamed to CP Axtra, SET ticker = CPAXT"),
+    ("INDORAMA", "IVL",    "SET ticker is IVL, not INDORAMA"),
+    ("PS",       "PSH",    "Pruksa renamed to PSH on SET"),
+    ("SHREIT",   "SHR",    "REIT renamed to SHR on SET"),
+    ("BRK.B",    "BRK-B",  "yfinance uses BRK-B (hyphen); exchange stays NYSE"),
 ]
 
-# ── exchange ผิด → ต้องแก้ (เคย SET แต่จริงๆ เป็น US) ──────────────────────
+# ── แก้ exchange ผิด (yahoo จะ compute ใหม่อัตโนมัติ) ──────────────────────
+# (symbol, new_exchange, reason)
 EXCHANGE_FIXES = [
-    # symbol, new_exchange, new_yahoo,  reason
-    ("HMC",  "NYSE",       "HMC",      "Honda Motor is NYSE:HMC, not SET"),
-    ("JD",   "NASDAQ",     "JD",       "JD.com is NASDAQ:JD, not SET"),
+    ("HMC", "NYSE",   "Honda Motor is NYSE:HMC, was wrongly set to SET"),
+    ("JD",  "NASDAQ", "JD.com is NASDAQ:JD, was wrongly set to SET"),
 ]
 
-# ── หุ้นที่ delisted / ข้อมูลผิด → ลบ ──────────────────────────────────────
+# ── ลบหุ้น delisted / ข้อมูลผิด ────────────────────────────────────────────
+# (symbol, reason)
 TO_DELETE = [
-    # symbol,   reason
-    ("DTAC",    "merged with TRUE (2023), delisted"),
-    ("ESSO",    "ESSO Thailand delisted"),
-    ("ROBINS",  "merged with CRC / Central, delisted"),
-    ("K",       "Kellanova acquired by Mars (2024), delisted"),
-    ("INTUCH",  "GULF acquired INTUCH, delisted"),
-    ("KBTG",    "KBTG is private (KBank tech subsidiary), never listed on SET"),
-    ("GL",      "Group Lease suspended / delisted"),
-    ("OISHI",   "ThaiBev took OISHI private, delisted"),
-    ("NHP",     "delisted, no data found"),
-    ("KPN",     "KPN Land delisted"),
-    ("PRUKSA",  "duplicate — PS is the correct SET symbol (both map to PSH)"),
+    ("DTAC",   "merged with TRUE (2023), delisted"),
+    ("ESSO",   "ESSO Thailand delisted"),
+    ("ROBINS", "merged with CRC/Central, delisted"),
+    ("K",      "Kellanova acquired by Mars (2024), delisted"),
+    ("INTUCH", "GULF acquired INTUCH, delisted"),
+    ("KBTG",   "KBTG is private (KBank tech subsidiary), never listed on SET"),
+    ("GL",     "Group Lease suspended/delisted"),
+    ("OISHI",  "ThaiBev took OISHI private, delisted"),
+    ("NHP",    "delisted, no data found"),
+    ("KPN",    "KPN Land delisted"),
+    ("PRUKSA", "duplicate — PS is the correct SET symbol (both = PSH now)"),
 ]
 
 
 class Command(BaseCommand):
-    help = "แก้ไข yahoo ticker ผิด และลบหุ้น delisted ออกจาก DB"
+    help = "แก้ไข symbol/exchange ผิด และลบหุ้น delisted ออกจาก DB"
 
     def add_arguments(self, parser):
         parser.add_argument(
@@ -60,68 +65,69 @@ class Command(BaseCommand):
         mode  = "APPLY" if apply else "DRY-RUN"
         self.stdout.write(f"\n=== fix_bad_symbols [{mode}] ===\n")
 
-        # ── 1. Fix yahoo ticker ──────────────────────────────────────────────
-        self.stdout.write("--- Ticker fixes ---")
-        for symbol, new_yahoo, reason in TICKER_FIXES:
+        # ── 1. Rename symbol ────────────────────────────────────────────────
+        self.stdout.write("--- Symbol renames ---")
+        for old_sym, new_sym, reason in SYMBOL_RENAMES:
             try:
-                obj = Symbol.objects.get(symbol=symbol)
-                old_yahoo = obj.yahoo
+                obj = Symbol.objects.get(symbol=old_sym)
+                price_count = PriceDaily.objects.filter(symbol=obj).count()
                 if apply:
-                    obj.yahoo = new_yahoo
-                    obj.save(update_fields=["yahoo"])
+                    obj.symbol = new_sym
+                    obj.save(update_fields=["symbol"])
                 self.stdout.write(
-                    f"  {'[FIXED]' if apply else '[WOULD FIX]'} "
-                    f"{symbol}: yahoo {old_yahoo} -> {new_yahoo}  ({reason})"
+                    f"  {'[RENAMED]' if apply else '[WOULD RENAME]'} "
+                    f"{old_sym} -> {new_sym}  ({price_count} price rows preserved)  ({reason})"
                 )
             except Symbol.DoesNotExist:
-                self.stdout.write(f"  [SKIP]  {symbol}: not in DB")
+                self.stdout.write(f"  [SKIP]  {old_sym}: not in DB")
 
-        # ── 2. Fix exchange ──────────────────────────────────────────────────
+        # ── 2. Fix exchange ─────────────────────────────────────────────────
         self.stdout.write("\n--- Exchange fixes ---")
-        for symbol, new_exchange, new_yahoo, reason in EXCHANGE_FIXES:
+        for sym, new_exchange, reason in EXCHANGE_FIXES:
             try:
-                obj = Symbol.objects.get(symbol=symbol)
-                old_ex, old_yah = obj.exchange, obj.yahoo
+                obj = Symbol.objects.get(symbol=sym)
+                old_exchange = obj.exchange
                 if apply:
                     obj.exchange = new_exchange
-                    obj.yahoo    = new_yahoo
-                    obj.save(update_fields=["exchange", "yahoo"])
+                    obj.save(update_fields=["exchange"])
                 self.stdout.write(
                     f"  {'[FIXED]' if apply else '[WOULD FIX]'} "
-                    f"{symbol}: exchange {old_ex}->{new_exchange}, yahoo {old_yah}->{new_yahoo}  ({reason})"
+                    f"{sym}: exchange {old_exchange} -> {new_exchange}  ({reason})"
                 )
             except Symbol.DoesNotExist:
-                self.stdout.write(f"  [SKIP]  {symbol}: not in DB")
+                self.stdout.write(f"  [SKIP]  {sym}: not in DB")
 
-        # ── 3. Delete delisted ───────────────────────────────────────────────
+        # ── 3. Delete delisted ──────────────────────────────────────────────
         self.stdout.write("\n--- Delete delisted ---")
         total_prices = 0
-        for symbol, reason in TO_DELETE:
+        deleted_count = 0
+        for sym, reason in TO_DELETE:
             try:
-                obj = Symbol.objects.get(symbol=symbol)
+                obj = Symbol.objects.get(symbol=sym)
                 price_count = PriceDaily.objects.filter(symbol=obj).count()
                 total_prices += price_count
                 if apply:
                     obj.delete()  # cascade ลบ PriceDaily + Indicator + Signal ด้วย
+                    deleted_count += 1
                 self.stdout.write(
                     f"  {'[DELETED]' if apply else '[WOULD DELETE]'} "
-                    f"{symbol}: {price_count} price rows  ({reason})"
+                    f"{sym}: {price_count} price rows  ({reason})"
                 )
             except Symbol.DoesNotExist:
-                self.stdout.write(f"  [SKIP]  {symbol}: not in DB")
+                self.stdout.write(f"  [SKIP]  {sym}: not in DB")
 
         # ── สรุป ────────────────────────────────────────────────────────────
-        self.stdout.write(f"\n{'='*50}")
+        self.stdout.write(f"\n{'='*55}")
         if apply:
             remaining = Symbol.objects.count()
             self.stdout.write(self.style.SUCCESS(
-                f"Done. {len(TICKER_FIXES)} tickers fixed, "
-                f"{len(EXCHANGE_FIXES)} exchanges fixed, "
-                f"{len(TO_DELETE)} symbols deleted "
-                f"(~{total_prices} price rows removed)\n"
-                f"Symbols remaining in DB: {remaining}"
+                f"Done.\n"
+                f"  Renamed : {len(SYMBOL_RENAMES)} symbols\n"
+                f"  Exchange: {len(EXCHANGE_FIXES)} fixed\n"
+                f"  Deleted : {deleted_count} symbols (~{total_prices} price rows removed)\n"
+                f"  Remaining in DB: {remaining} symbols"
             ))
         else:
             self.stdout.write(
-                f"[DRY-RUN] No changes made. Run with --apply to execute."
+                "No changes made. Run with --apply to execute."
             )
