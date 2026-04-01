@@ -1,5 +1,5 @@
 """
-GitHub Actions — ดึงราคาหุ้นจาก Stooq (หลัก) และ Yahoo Finance (fallback)
+GitHub Actions — ดึงราคาหุ้นจาก Stooq (หลัก) และ Yahoo Finance batch (fallback)
 แล้วส่งไปยัง VPS
 
 Environment variables (GitHub Secrets):
@@ -26,8 +26,8 @@ VPS_API_TOKEN = os.environ.get("VPS_API_TOKEN", "").strip()
 
 BATCH_SIZE        = 200
 SLEEP_TICKER      = 0.3   # delay หลังแต่ละ ticker (Stooq)
-SLEEP_YAHOO       = 0.8   # delay หลัง Yahoo Finance call (ป้องกัน rate limit)
 MAX_RETRIES       = 3
+YAHOO_BATCH_SIZE  = 50    # จำนวน ticker ต่อ batch ใน yf.download()
 
 
 def get_symbols() -> list[dict]:
@@ -85,35 +85,98 @@ def fetch_ticker_stooq(stooq_ticker: str, start: date, end: date) -> list[dict]:
     return []
 
 
-def fetch_ticker_yahoo(symbol: str, yahoo_ticker: str, start: date, end: date) -> list[dict]:
-    """Fallback: ดึงราคาจาก Yahoo Finance ผ่าน yf.Ticker().history()
-    ใช้ Ticker API แทน yf.download() เพื่อหลีกเลี่ยง multi-level DataFrame"""
-    try:
-        import yfinance as yf
-        ticker = yahoo_ticker if yahoo_ticker else symbol
-        df = yf.Ticker(ticker).history(start=start.isoformat(), end=end.isoformat())
-        if df.empty:
-            return []
-        rows = []
-        for idx, row in df.iterrows():
-            try:
-                close = float(row["Close"])
-            except (ValueError, TypeError):
-                continue
-            if close == 0:
-                continue
-            rows.append({
-                "date":   idx.date().isoformat(),
-                "open":   round(float(row.get("Open",  close)), 4),
-                "high":   round(float(row.get("High",  close)), 4),
-                "low":    round(float(row.get("Low",   close)), 4),
-                "close":  round(close, 4),
-                "volume": int(row["Volume"]) if row.get("Volume") and not pd.isna(row["Volume"]) else 0,
-            })
-        return rows
-    except Exception as e:
-        print(f"  ✗ Yahoo fallback {symbol}: {e}")
+def parse_ticker_df(df: pd.DataFrame, ticker: str) -> list[dict]:
+    """แปลง DataFrame (single-level) ของ ticker หนึ่งตัวเป็น list[dict]"""
+    if df is None or df.empty:
         return []
+    rows = []
+    for idx, row in df.iterrows():
+        try:
+            close = float(row["Close"])
+        except (ValueError, TypeError, KeyError):
+            continue
+        if close == 0 or pd.isna(close):
+            continue
+        try:
+            vol = int(row["Volume"]) if not pd.isna(row.get("Volume", float("nan"))) else 0
+        except (ValueError, TypeError):
+            vol = 0
+        rows.append({
+            "date":   idx.date().isoformat() if hasattr(idx, "date") else str(idx)[:10],
+            "open":   round(float(row.get("Open",  close)), 4),
+            "high":   round(float(row.get("High",  close)), 4),
+            "low":    round(float(row.get("Low",   close)), 4),
+            "close":  round(close, 4),
+            "volume": vol,
+        })
+    return rows
+
+
+def fetch_batch_yahoo(sym_map: dict[str, str], start: date, end: date) -> dict[str, list[dict]]:
+    """
+    ดึงราคาจาก Yahoo Finance แบบ batch ด้วย yf.download()
+    sym_map: {symbol: yahoo_ticker}  เช่น {"PTT": "PTT.BK", "AAPL": "AAPL"}
+    คืน:     {symbol: list[dict]}
+    """
+    import yfinance as yf
+
+    result: dict[str, list[dict]] = {}
+    symbols_list = list(sym_map.keys())
+
+    # แบ่งเป็น batch ย่อย เพื่อลด request size
+    for batch_start in range(0, len(symbols_list), YAHOO_BATCH_SIZE):
+        batch_syms = symbols_list[batch_start : batch_start + YAHOO_BATCH_SIZE]
+        batch_tickers = [sym_map[s] for s in batch_syms]
+
+        for attempt in range(MAX_RETRIES):
+            try:
+                if len(batch_tickers) == 1:
+                    # Single ticker → ใช้ Ticker().history() (ไม่มี MultiIndex)
+                    ticker = batch_tickers[0]
+                    df = yf.Ticker(ticker).history(
+                        start=start.isoformat(), end=end.isoformat()
+                    )
+                    sym = batch_syms[0]
+                    result[sym] = parse_ticker_df(df, ticker)
+                else:
+                    # Multiple tickers → yf.download() ให้ MultiIndex columns
+                    df_all = yf.download(
+                        batch_tickers,
+                        start=start.isoformat(),
+                        end=end.isoformat(),
+                        group_by="ticker",
+                        auto_adjust=True,
+                        progress=False,
+                        threads=True,
+                    )
+                    for sym, ticker in zip(batch_syms, batch_tickers):
+                        try:
+                            # MultiIndex: ระดับ 0 = ticker, ระดับ 1 = column
+                            if ticker in df_all.columns.get_level_values(0):
+                                ticker_df = df_all[ticker].copy()
+                            else:
+                                ticker_df = pd.DataFrame()
+                            result[sym] = parse_ticker_df(ticker_df, ticker)
+                        except Exception as ex:
+                            print(f"  ✗ parse {sym} ({ticker}): {ex}")
+                            result[sym] = []
+                break  # batch สำเร็จ → ออก retry loop
+
+            except Exception as e:
+                if attempt < MAX_RETRIES - 1:
+                    wait = 10 * (attempt + 1)
+                    print(f"  ⚠ Yahoo batch retry {attempt+1} (wait {wait}s): {e}")
+                    time.sleep(wait)
+                else:
+                    print(f"  ✗ Yahoo batch failed: {e}")
+                    for sym in batch_syms:
+                        result.setdefault(sym, [])
+
+        # หน่วงระหว่าง batch เพื่อไม่โดน rate limit
+        if batch_start + YAHOO_BATCH_SIZE < len(symbols_list):
+            time.sleep(3)
+
+    return result
 
 
 def send_to_vps(records: list[dict]) -> tuple[int, int]:
@@ -156,7 +219,7 @@ def main():
     end   = date.today() + timedelta(days=1)
     start = date.today() - timedelta(days=args.days)
 
-    print(f"📡 ดึงข้อมูลจาก {start} ถึง {end} (Stooq=Thai, Yahoo=US)")
+    print(f"📡 ดึงข้อมูลจาก {start} ถึง {end}")
 
     # ── ดึง symbols จาก VPS ──
     print("🔍 กำลังโหลดรายชื่อหุ้น...")
@@ -166,68 +229,110 @@ def main():
         print(f"❌ โหลดรายชื่อหุ้นไม่ได้: {e}")
         sys.exit(1)
 
-    print(f"✅ พบ {len(symbols)} หุ้น (Thai + US)")
+    print(f"✅ พบ {len(symbols)} หุ้น")
 
-    # ── ดึงราคาทีละตัว ──
-    all_records = []
-    ok = fail = yahoo_direct = yahoo_fallback = 0
+    # แบ่ง Thai vs US
+    thai_syms = []  # [(symbol, yahoo, stooq_ticker), ...]
+    us_syms   = []  # [(symbol, yahoo), ...]
 
-    for i, sym in enumerate(symbols, 1):
-        symbol       = sym["symbol"]
-        yahoo        = sym.get("yahoo", symbol)
-        exchange     = sym.get("exchange", "")
-        is_us        = exchange in ("NASDAQ", "NYSE")
-        stooq_ticker = to_stooq_ticker(symbol, yahoo)
+    for sym in symbols:
+        symbol   = sym["symbol"]
+        yahoo    = sym.get("yahoo", symbol)
+        exchange = sym.get("exchange", "")
+        is_us    = exchange in ("NASDAQ", "NYSE")
 
         if is_us:
-            # US stocks: ใช้ Yahoo Finance ตรงๆ (Stooq มักบล็อก GitHub Actions)
-            rows = fetch_ticker_yahoo(symbol, yahoo, start, end)
-            time.sleep(SLEEP_YAHOO)
-            if not rows:
-                # retry 1 ครั้งถ้า rate limit
-                time.sleep(5)
-                rows = fetch_ticker_yahoo(symbol, yahoo, start, end)
-                time.sleep(SLEEP_YAHOO)
-            if rows:
-                yahoo_direct += 1
-            else:
-                # fallback ไป Stooq ถ้า Yahoo ไม่ได้จริงๆ
-                rows = fetch_ticker_stooq(stooq_ticker, start, end)
+            us_syms.append((symbol, yahoo))
         else:
-            # Thai stocks: ใช้ Stooq ก่อน → fallback Yahoo
-            rows = fetch_ticker_stooq(stooq_ticker, start, end)
-            if not rows:
-                rows = fetch_ticker_yahoo(symbol, yahoo, start, end)
-                time.sleep(SLEEP_YAHOO)
-                if not rows:
-                    # retry 1 ครั้งถ้า rate limit
-                    time.sleep(5)
-                    rows = fetch_ticker_yahoo(symbol, yahoo, start, end)
-                    time.sleep(SLEEP_YAHOO)
-                if rows:
-                    yahoo_fallback += 1
+            stooq_ticker = to_stooq_ticker(symbol, yahoo)
+            thai_syms.append((symbol, yahoo, stooq_ticker))
 
+    print(f"  Thai: {len(thai_syms)} ตัว  |  US: {len(us_syms)} ตัว")
+
+    all_records = []
+
+    # ══════════════════════════════════════════
+    # Phase 1: Stooq → Thai stocks
+    # ══════════════════════════════════════════
+    print("\n📥 Phase 1: Stooq (Thai stocks)...")
+    stooq_ok   = 0
+    stooq_fail = []  # list of (symbol, yahoo) ที่ต้อง fallback
+
+    for i, (symbol, yahoo, stooq_ticker) in enumerate(thai_syms, 1):
+        rows = fetch_ticker_stooq(stooq_ticker, start, end)
         if rows:
             for row in rows:
                 row["symbol"] = symbol
             all_records.extend(rows)
-            ok += 1
+            stooq_ok += 1
         else:
-            fail += 1
+            stooq_fail.append((symbol, yahoo))
 
-        if i % 20 == 0:
-            print(f"  [{i}/{len(symbols)}] ✅{ok} ❌{fail} (Yahoo fallback: {yahoo_fallback})")
+        if i % 50 == 0:
+            print(f"  [{i}/{len(thai_syms)}] Stooq ✅{stooq_ok} / ❌{len(stooq_fail)} (ต้อง fallback)")
 
         time.sleep(SLEEP_TICKER)
 
-    print(f"\n📊 ดึงได้ {ok} หุ้น / ไม่ได้ {fail} หุ้น / Yahoo direct {yahoo_direct} ตัว / Yahoo fallback {yahoo_fallback} ตัว / รวม {len(all_records)} แถว")
+    print(f"  Stooq: ✅{stooq_ok} สำเร็จ  |  ❌{len(stooq_fail)} ต้อง fallback → Yahoo")
+
+    # ══════════════════════════════════════════
+    # Phase 2: Yahoo batch → Thai stocks ที่ Stooq ไม่ได้
+    # ══════════════════════════════════════════
+    if stooq_fail:
+        print(f"\n📥 Phase 2: Yahoo batch (Thai fallback {len(stooq_fail)} ตัว)...")
+        sym_map = {sym: yah for sym, yah in stooq_fail}
+        batch_result = fetch_batch_yahoo(sym_map, start, end)
+
+        yahoo_thai_ok   = 0
+        yahoo_thai_fail = 0
+        for symbol, rows in batch_result.items():
+            if rows:
+                for row in rows:
+                    row["symbol"] = symbol
+                all_records.extend(rows)
+                yahoo_thai_ok += 1
+            else:
+                yahoo_thai_fail += 1
+                print(f"  ✗ ไม่ได้ข้อมูล: {symbol}")
+
+        print(f"  Yahoo Thai: ✅{yahoo_thai_ok}  ❌{yahoo_thai_fail}")
+    else:
+        yahoo_thai_ok = yahoo_thai_fail = 0
+
+    # ══════════════════════════════════════════
+    # Phase 3: Yahoo batch → US stocks (ทั้งหมด)
+    # ══════════════════════════════════════════
+    us_ok = us_fail = 0
+    if us_syms:
+        print(f"\n📥 Phase 3: Yahoo batch (US {len(us_syms)} ตัว)...")
+        sym_map = {sym: yah for sym, yah in us_syms}
+        batch_result = fetch_batch_yahoo(sym_map, start, end)
+
+        for symbol, rows in batch_result.items():
+            if rows:
+                for row in rows:
+                    row["symbol"] = symbol
+                all_records.extend(rows)
+                us_ok += 1
+            else:
+                us_fail += 1
+                print(f"  ✗ ไม่ได้ข้อมูล: {symbol}")
+
+        print(f"  Yahoo US: ✅{us_ok}  ❌{us_fail}")
+
+    # ── สรุป ──
+    total_ok   = stooq_ok + yahoo_thai_ok + us_ok
+    total_fail = yahoo_thai_fail + us_fail
+    print(f"\n📊 สรุป: ✅{total_ok} ตัวได้ข้อมูล  ❌{total_fail} ตัวไม่ได้")
+    print(f"   Stooq: {stooq_ok}  |  Yahoo Thai fallback: {yahoo_thai_ok}  |  Yahoo US: {us_ok}")
+    print(f"   รวม {len(all_records)} แถว")
 
     # ── ส่งไป VPS ──
     if not all_records:
         print("⚠️ ไม่มีข้อมูลที่จะส่ง")
         sys.exit(0)
 
-    print(f"📤 กำลังส่งข้อมูลไปยัง VPS ({len(all_records)} แถว)...")
+    print(f"\n📤 กำลังส่งข้อมูลไปยัง VPS ({len(all_records)} แถว)...")
     imported, skipped = send_to_vps(all_records)
     print(f"✅ import: {imported} แถว  |  skip: {skipped} แถว")
 
