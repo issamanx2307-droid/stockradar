@@ -17,12 +17,12 @@ from radar.models import Symbol, PriceDaily
 
 # ── เปลี่ยนชื่อ symbol (SET: yahoo=symbol.BK จะตามไปเอง) ──────────────────
 # (old_symbol, new_symbol, reason)
+# หมายเหตุ: MAKRO และ INDORAMA ไม่อยู่ที่นี่ เพราะ CPAXT/IVL มีอยู่ใน DB แล้ว
+#           → ย้ายไปอยู่ใน TO_DELETE แทน
 SYMBOL_RENAMES = [
-    ("MAKRO",    "CPAXT",  "renamed to CP Axtra, SET ticker = CPAXT"),
-    ("INDORAMA", "IVL",    "SET ticker is IVL, not INDORAMA"),
-    ("PS",       "PSH",    "Pruksa renamed to PSH on SET"),
-    ("SHREIT",   "SHR",    "REIT renamed to SHR on SET"),
-    ("BRK.B",    "BRK-B",  "yfinance uses BRK-B (hyphen); exchange stays NYSE"),
+    ("PS",    "PSH",   "Pruksa renamed to PSH on SET"),
+    ("SHREIT","SHR",   "REIT renamed to SHR on SET"),
+    ("BRK.B", "BRK-B", "yfinance uses BRK-B (hyphen); exchange stays NYSE"),
 ]
 
 # ── แก้ exchange ผิด (yahoo จะ compute ใหม่อัตโนมัติ) ──────────────────────
@@ -35,6 +35,8 @@ EXCHANGE_FIXES = [
 # ── ลบหุ้น delisted / ข้อมูลผิด ────────────────────────────────────────────
 # (symbol, reason)
 TO_DELETE = [
+    ("MAKRO",  "CPAXT already exists in DB; MAKRO = old name, delete duplicate"),
+    ("INDORAMA","IVL already exists in DB; INDORAMA = wrong symbol, delete duplicate"),
     ("DTAC",   "merged with TRUE (2023), delisted"),
     ("ESSO",   "ESSO Thailand delisted"),
     ("ROBINS", "merged with CRC/Central, delisted"),
