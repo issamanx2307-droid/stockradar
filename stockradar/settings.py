@@ -8,9 +8,14 @@ import dj_database_url
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY", "dev-secret-key-change-in-production")
+DEBUG = os.environ.get("DEBUG", "False") == "True"
 
-DEBUG = os.environ.get("DEBUG", "True") == "True"
+_secret = os.environ.get("DJANGO_SECRET_KEY")
+if not _secret:
+    if not DEBUG:
+        raise RuntimeError("DJANGO_SECRET_KEY environment variable must be set in production")
+    _secret = "dev-secret-key-change-in-production"
+SECRET_KEY = _secret
 
 ALLOWED_HOSTS = os.environ.get(
     "ALLOWED_HOSTS", "localhost,127.0.0.1"
@@ -160,9 +165,15 @@ REST_FRAMEWORK = {
     ],
     "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
     "PAGE_SIZE": 50,
-    "DEFAULT_THROTTLE_CLASSES": [],
+    "DEFAULT_THROTTLE_CLASSES": [
+        "rest_framework.throttling.AnonRateThrottle",
+        "rest_framework.throttling.UserRateThrottle",
+    ],
     "DEFAULT_THROTTLE_RATES": {
-        "anon": "10000/day",
+        "anon": "60/hour",      # ไม่ login: 60 req/ชั่วโมง
+        "user": "1000/day",     # login แล้ว: 1000 req/วัน
+        "scanner": "20/hour",   # scanner endpoint (คำนวณหนัก)
+        "backtest": "10/hour",  # backtest endpoint (หนักมาก)
     },
     "DEFAULT_AUTHENTICATION_CLASSES": [
         "rest_framework.authentication.TokenAuthentication",
@@ -247,7 +258,8 @@ USE_TZ = True
 
 STATIC_URL = "/static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
-STATICFILES_DIRS = [BASE_DIR / "static"]
+# รวม BASE_DIR/static เฉพาะเมื่อมีอยู่จริง (ป้องกัน warning บน VPS)
+STATICFILES_DIRS = [d for d in [BASE_DIR / "static"] if d.exists()]
 STATICFILES_STORAGE = "whitenoise.storage.CompressedStaticFilesStorage"
 
 MEDIA_URL = "/media/"

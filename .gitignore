@@ -43,6 +43,9 @@ Thumbs.db
 # Claude Code
 .claude/
 
+# Sensitive docs (may contain credentials)
+PROGRESS.md
+
 # Temp
 logs/*.tmp
 logs/*.log

@@ -12,11 +12,12 @@ from django.db import models
 from django.db.models import Subquery, OuterRef
 from django.utils import timezone
 from rest_framework import generics, filters
-from rest_framework.decorators import api_view, permission_classes
+from rest_framework.decorators import api_view, permission_classes, throttle_classes
 from rest_framework.response import Response
 from rest_framework.permissions import AllowAny
 
 from .decorators import pro_required
+from .throttles import ScannerThrottle, BacktestThrottle
 from .models import (
     Symbol,
     PriceDaily,
@@ -292,6 +293,7 @@ class SignalListView(generics.ListAPIView):
 # ─── Scanner (Pro) ────────────────────────────────────────────────────────────
 
 @api_view(["GET"])
+@throttle_classes([ScannerThrottle])
 def scanner_view(request):
     """
     GET /api/scanner/
@@ -415,6 +417,7 @@ def scanner_view(request):
 # ─── Scanner Run ──────────────────────────────────────────────────────────────
 
 @api_view(["POST"])
+@throttle_classes([ScannerThrottle])
 def run_scanner_api(request):
     """POST /api/scanner/run/ — พร้อม WebSocket broadcast"""
     exchange = request.data.get("exchange")
@@ -443,6 +446,7 @@ def run_scanner_api(request):
 # ─── Backtest ─────────────────────────────────────────────────────────────────
 
 @api_view(["POST"])
+@throttle_classes([BacktestThrottle])
 @pro_required
 def run_backtest_api(request):
     """POST /api/backtest/"""

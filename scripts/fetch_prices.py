@@ -1,8 +1,9 @@
 """
-GitHub Actions — ดึงราคาหุ้นจาก Stooq (ฟรี ไม่ถูก block) แล้วส่งไปยัง VPS
+GitHub Actions — ดึงราคาหุ้นจาก Stooq (หลัก) และ Yahoo Finance (fallback)
+แล้วส่งไปยัง VPS
 
 Environment variables (GitHub Secrets):
-    VPS_API_URL   = http://187.127.107.228
+    VPS_API_URL   = https://radarhoon.com
     VPS_API_TOKEN = <IMPORT_API_TOKEN ใน .env ของ VPS>
 
 Usage:
@@ -47,7 +48,7 @@ def to_stooq_ticker(symbol: str, yahoo: str) -> str:
 
 
 def fetch_ticker_stooq(stooq_ticker: str, start: date, end: date) -> list[dict]:
-    """ดึงราคาจาก Stooq ผ่าน pandas_datareader"""
+    """ดึงราคาจาก Stooq"""
     url = (
         f"https://stooq.com/q/d/l/"
         f"?s={stooq_ticker.lower()}&d1={start.strftime('%Y%m%d')}"
@@ -81,6 +82,34 @@ def fetch_ticker_stooq(stooq_ticker: str, start: date, end: date) -> list[dict]:
             else:
                 print(f"  ✗ {stooq_ticker}: {e}")
     return []
+
+
+def fetch_ticker_yahoo(symbol: str, yahoo_ticker: str, start: date, end: date) -> list[dict]:
+    """Fallback: ดึงราคาจาก Yahoo Finance เมื่อ Stooq ไม่มีข้อมูล"""
+    try:
+        import yfinance as yf
+        ticker = yahoo_ticker if yahoo_ticker else symbol
+        df = yf.download(ticker, start=start.isoformat(), end=end.isoformat(),
+                         progress=False, auto_adjust=True)
+        if df.empty:
+            return []
+        rows = []
+        for idx, row in df.iterrows():
+            close = row.get("Close")
+            if pd.isna(close) or float(close) == 0:
+                continue
+            rows.append({
+                "date":   idx.date().isoformat(),
+                "open":   round(float(row.get("Open",  close)), 4),
+                "high":   round(float(row.get("High",  close)), 4),
+                "low":    round(float(row.get("Low",   close)), 4),
+                "close":  round(float(close), 4),
+                "volume": int(row["Volume"]) if not pd.isna(row.get("Volume", 0)) else 0,
+            })
+        return rows
+    except Exception as e:
+        print(f"  ✗ Yahoo fallback {symbol}: {e}")
+        return []
 
 
 def send_to_vps(records: list[dict]) -> tuple[int, int]:
@@ -137,7 +166,7 @@ def main():
 
     # ── ดึงราคาทีละตัว ──
     all_records = []
-    ok = fail = 0
+    ok = fail = yahoo_fallback = 0
 
     for i, sym in enumerate(symbols, 1):
         symbol       = sym["symbol"]
@@ -145,6 +174,12 @@ def main():
         stooq_ticker = to_stooq_ticker(symbol, yahoo)
 
         rows = fetch_ticker_stooq(stooq_ticker, start, end)
+        if not rows:
+            # Stooq ไม่มีข้อมูล → ลอง Yahoo Finance
+            rows = fetch_ticker_yahoo(symbol, yahoo, start, end)
+            if rows:
+                yahoo_fallback += 1
+
         if rows:
             for row in rows:
                 row["symbol"] = symbol
@@ -154,11 +189,11 @@ def main():
             fail += 1
 
         if i % 20 == 0:
-            print(f"  [{i}/{len(symbols)}] ✅{ok} ❌{fail}")
+            print(f"  [{i}/{len(symbols)}] ✅{ok} ❌{fail} (Yahoo fallback: {yahoo_fallback})")
 
         time.sleep(SLEEP_TICKER)
 
-    print(f"\n📊 ดึงได้ {ok} หุ้น / ไม่ได้ {fail} หุ้น / รวม {len(all_records)} แถว")
+    print(f"\n📊 ดึงได้ {ok} หุ้น / ไม่ได้ {fail} หุ้น / Yahoo fallback {yahoo_fallback} ตัว / รวม {len(all_records)} แถว")
 
     # ── ส่งไป VPS ──
     if not all_records:

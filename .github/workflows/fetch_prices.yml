@@ -28,7 +28,7 @@ jobs:
           cache: pip
 
       - name: Install dependencies
-        run: pip install requests pandas pandas-datareader
+        run: pip install requests pandas pandas-datareader yfinance
 
       - name: Fetch & send prices (daily)
         if: github.event_name == 'schedule'
