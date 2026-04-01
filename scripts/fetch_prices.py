@@ -183,10 +183,15 @@ def main():
             # US stocks: ใช้ Yahoo Finance ตรงๆ (Stooq มักบล็อก GitHub Actions)
             rows = fetch_ticker_yahoo(symbol, yahoo, start, end)
             time.sleep(SLEEP_YAHOO)
+            if not rows:
+                # retry 1 ครั้งถ้า rate limit
+                time.sleep(5)
+                rows = fetch_ticker_yahoo(symbol, yahoo, start, end)
+                time.sleep(SLEEP_YAHOO)
             if rows:
                 yahoo_direct += 1
             else:
-                # fallback ไป Stooq ถ้า Yahoo ไม่ได้
+                # fallback ไป Stooq ถ้า Yahoo ไม่ได้จริงๆ
                 rows = fetch_ticker_stooq(stooq_ticker, start, end)
         else:
             # Thai stocks: ใช้ Stooq ก่อน → fallback Yahoo
@@ -194,6 +199,11 @@ def main():
             if not rows:
                 rows = fetch_ticker_yahoo(symbol, yahoo, start, end)
                 time.sleep(SLEEP_YAHOO)
+                if not rows:
+                    # retry 1 ครั้งถ้า rate limit
+                    time.sleep(5)
+                    rows = fetch_ticker_yahoo(symbol, yahoo, start, end)
+                    time.sleep(SLEEP_YAHOO)
                 if rows:
                     yahoo_fallback += 1
 
