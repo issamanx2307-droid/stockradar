@@ -85,26 +85,29 @@ def fetch_ticker_stooq(stooq_ticker: str, start: date, end: date) -> list[dict]:
 
 
 def fetch_ticker_yahoo(symbol: str, yahoo_ticker: str, start: date, end: date) -> list[dict]:
-    """Fallback: ดึงราคาจาก Yahoo Finance เมื่อ Stooq ไม่มีข้อมูล"""
+    """Fallback: ดึงราคาจาก Yahoo Finance ผ่าน yf.Ticker().history()
+    ใช้ Ticker API แทน yf.download() เพื่อหลีกเลี่ยง multi-level DataFrame"""
     try:
         import yfinance as yf
         ticker = yahoo_ticker if yahoo_ticker else symbol
-        df = yf.download(ticker, start=start.isoformat(), end=end.isoformat(),
-                         progress=False, auto_adjust=True)
+        df = yf.Ticker(ticker).history(start=start.isoformat(), end=end.isoformat())
         if df.empty:
             return []
         rows = []
         for idx, row in df.iterrows():
-            close = row.get("Close")
-            if pd.isna(close) or float(close) == 0:
+            try:
+                close = float(row["Close"])
+            except (ValueError, TypeError):
+                continue
+            if close == 0:
                 continue
             rows.append({
                 "date":   idx.date().isoformat(),
                 "open":   round(float(row.get("Open",  close)), 4),
                 "high":   round(float(row.get("High",  close)), 4),
                 "low":    round(float(row.get("Low",   close)), 4),
-                "close":  round(float(close), 4),
-                "volume": int(row["Volume"]) if not pd.isna(row.get("Volume", 0)) else 0,
+                "close":  round(close, 4),
+                "volume": int(row["Volume"]) if row.get("Volume") and not pd.isna(row["Volume"]) else 0,
             })
         return rows
     except Exception as e:
@@ -152,7 +155,7 @@ def main():
     end   = date.today() + timedelta(days=1)
     start = date.today() - timedelta(days=args.days)
 
-    print(f"📡 ดึงข้อมูลจาก {start} ถึง {end} (แหล่ง: Stooq)")
+    print(f"📡 ดึงข้อมูลจาก {start} ถึง {end} (Stooq=Thai, Yahoo=US)")
 
     # ── ดึง symbols จาก VPS ──
     print("🔍 กำลังโหลดรายชื่อหุ้น...")
@@ -166,19 +169,30 @@ def main():
 
     # ── ดึงราคาทีละตัว ──
     all_records = []
-    ok = fail = yahoo_fallback = 0
+    ok = fail = yahoo_direct = yahoo_fallback = 0
 
     for i, sym in enumerate(symbols, 1):
         symbol       = sym["symbol"]
         yahoo        = sym.get("yahoo", symbol)
+        exchange     = sym.get("exchange", "")
+        is_us        = exchange in ("NASDAQ", "NYSE")
         stooq_ticker = to_stooq_ticker(symbol, yahoo)
 
-        rows = fetch_ticker_stooq(stooq_ticker, start, end)
-        if not rows:
-            # Stooq ไม่มีข้อมูล → ลอง Yahoo Finance
+        if is_us:
+            # US stocks: ใช้ Yahoo Finance ตรงๆ (Stooq มักบล็อก GitHub Actions)
             rows = fetch_ticker_yahoo(symbol, yahoo, start, end)
             if rows:
-                yahoo_fallback += 1
+                yahoo_direct += 1
+            else:
+                # fallback ไป Stooq ถ้า Yahoo ไม่ได้
+                rows = fetch_ticker_stooq(stooq_ticker, start, end)
+        else:
+            # Thai stocks: ใช้ Stooq ก่อน → fallback Yahoo
+            rows = fetch_ticker_stooq(stooq_ticker, start, end)
+            if not rows:
+                rows = fetch_ticker_yahoo(symbol, yahoo, start, end)
+                if rows:
+                    yahoo_fallback += 1
 
         if rows:
             for row in rows:
@@ -193,7 +207,7 @@ def main():
 
         time.sleep(SLEEP_TICKER)
 
-    print(f"\n📊 ดึงได้ {ok} หุ้น / ไม่ได้ {fail} หุ้น / Yahoo fallback {yahoo_fallback} ตัว / รวม {len(all_records)} แถว")
+    print(f"\n📊 ดึงได้ {ok} หุ้น / ไม่ได้ {fail} หุ้น / Yahoo direct {yahoo_direct} ตัว / Yahoo fallback {yahoo_fallback} ตัว / รวม {len(all_records)} แถว")
 
     # ── ส่งไป VPS ──
     if not all_records:
