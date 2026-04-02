@@ -20,6 +20,7 @@ import EngineBacktest from "./pages/EngineBacktest"
 import Watchlist from "./pages/Watchlist"
 import Fundamental from "./pages/Fundamental"
 import VIScreen from "./pages/VIScreen"
+import MultiLayerScanner from "./pages/MultiLayerScanner"
 import Chat from "./pages/Chat"
 import { AutoTermHighlight, TermAssistantProvider, TermAssistantToggle } from "./components/TermAssistant"
 import TickerTape from "./components/TickerTape"
@@ -35,6 +36,7 @@ const USER_NAV: { id: string; label: string; icon: string }[] = [
   { id: "fundamental",  label: "Fundamental",         icon: "📊" },
   { id: "vi_screen",    label: "หุ้น VI",              icon: "💎" },
   { id: "portfolio",    label: "Portfolio",           icon: "💼" },
+  { id: "multi_layer",  label: "Multi-Layer Scanner", icon: "🎯" },
   { id: "scanner",      label: "สแกนหุ้น",           icon: "🔍" },
   { id: "chart",        label: "กราฟ",               icon: "📈" },
   { id: "strategy",     label: "กลยุทธ์",             icon: "🎯" },
@@ -52,7 +54,7 @@ function AppInner() {
   // ── hash-based navigation (persist page on refresh) ──────────────────────
   const VALID_PAGES = [
     "dashboard","engine_scan","watchlist","news","analyze","fundamental",
-    "vi_screen","scanner","chart","strategy","backtest",
+    "vi_screen","multi_layer","scanner","chart","strategy","backtest",
     "guide","profile","contact","subscription","chat",
   ]
   function getHashPage(fallback: string) {
@@ -245,6 +247,7 @@ function AppInner() {
             {page === "fundamental"  && <Fundamental onOpenChart={openChart} />}
             {page === "vi_screen"    && <VIScreen onOpenChart={openChart} />}
             {page === "portfolio"    && user?.can_use_portfolio && <Portfolio onOpenChart={openChart} />}
+            {page === "multi_layer"  && <MultiLayerScanner onOpenChart={openChart} onAnalyze={openAnalyze} />}
             {page === "scanner"      && <Scanner onOpenChart={openChart} onAnalyze={openAnalyze} />}
             {page === "chart"        && <Chart symbol={chartSymbol} />}
             {page === "strategy"     && <StrategyBuilder />}

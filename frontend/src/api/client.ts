@@ -85,6 +85,10 @@ export const api = {
       body: JSON.stringify(body),
     }),
 
+  // ── Multi-Layer Scanner ───────────────────────────────────────────────────
+  getMultiLayer: (params: Record<string, string> = {}): Promise<{ count: number; results: any[] }> =>
+    apiFetch("/multi-layer/?" + new URLSearchParams(params)),
+
   // ── Chat ──────────────────────────────────────────────────────────────────
   chatSend: (body: string, receiver_id?: number): Promise<ChatMessageInfo> =>
     apiFetch("/chat/send/", {

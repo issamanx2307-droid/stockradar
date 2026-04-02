@@ -355,6 +355,68 @@ const MENU_GUIDE: MenuItem[] = [
     ],
   },
   {
+    id: "multi_layer", icon: "🎯", label: "Multi-Layer Scanner", color: "#7c4dff",
+    purpose: "สแกนหุ้นผ่าน 4 ด่านพร้อมกัน — ไม่ใช่แค่ตัวเลข Score แต่บอกได้ว่าหุ้นผ่านหรือไม่ผ่านด่านไหน และทำไม เหมาะสำหรับหาจุดเข้าที่มีเหตุผลรองรับหลายด้านพร้อมกัน",
+    howBuilt: [
+      "Layer 1 (Trend): ตรวจ EMA20/50/200 alignment — ถ้า EMA20>EMA50>EMA200 = Strong Uptrend",
+      "Layer 2 (Structure): คำนวณ Pivot Points + หา Dynamic S/R จาก Local High/Low ที่ราคาแตะ ≥ 2 ครั้งใน 60 วัน",
+      "Layer 3 (Pattern): ตรวจ Candlestick 6 แบบ จาก OHLC ล้วนๆ ได้แก่ Hammer, Shooting Star, Bullish/Bearish Engulfing, Doji, Pin Bar",
+      "Layer 4 (Momentum): RSI zone + MACD Histogram direction — ตรวจว่า momentum สนับสนุน setup ไหม",
+      "ผลลัพธ์: layers_passed (0-4), setup (BUY/SELL/WATCH/NEUTRAL), confidence (HIGH/MEDIUM/LOW)",
+    ],
+    sections: [
+      { title: "🔄 ลำดับการกรอง (Filter Chain)", items: [
+        "📈 Layer 1 Trend → ตอบว่า 'เทรนด์ไปทางไหน?'",
+        "🏗️ Layer 2 Structure → ตอบว่า 'ราคาอยู่จุดไหนของโครงสร้าง?'",
+        "🕯️ Layer 3 Pattern → ตอบว่า 'มี Signal เข้าจริงไหม?'",
+        "⚡ Layer 4 Momentum → ตอบว่า 'momentum สนับสนุนไหม?'",
+        "หุ้นที่ผ่านทั้ง 4 layer = Setup ที่มีเหตุผลรองรับรอบด้าน",
+      ]},
+      { title: "🟢 Layer 1 — Trend (EMA)", items: [
+        "STRONG_UP: EMA20 > EMA50 > EMA200 + ราคาเหนือ EMA50 → ผ่าน ✅",
+        "WEAK_UP: EMA20 > EMA50 แต่ยังต่ำกว่า EMA200 → ผ่าน ✅ (เพิ่งฟื้น)",
+        "STRONG_DOWN: EMA20 < EMA50 < EMA200 → ผ่าน ✅ สำหรับ SELL setup",
+        "SIDEWAYS: EMA20 ≈ EMA50 (ห่าง < 1%) → ไม่ผ่าน ❌",
+      ]},
+      { title: "🏗️ Layer 2 — Structure (S/R)", items: [
+        "Pivot Points: PP, R1, R2, S1, S2 คำนวณจาก High/Low/Close วันก่อน",
+        "Dynamic S/R: หา Local High/Low ใน 60 วันที่ราคาแตะซ้ำ ≥ 2 ครั้ง",
+        "BUY pass: ราคาใกล้แนวรับ ≤ 3% และไม่ชนแนวต้าน",
+        "SELL pass: ราคาใกล้แนวต้าน ≤ 3% และไม่อยู่เหนือแนวรับ",
+        "Popup รายละเอียดจะแสดง Level ทุกเส้นพร้อมสี S=เขียว R=แดง",
+      ]},
+      { title: "🕯️ Layer 3 — Pattern (Candlestick)", items: [
+        "Hammer 🔨: ไส้ล่าง > 2× body, ไส้บน < 30% body → กลับตัวขาขึ้น",
+        "Shooting Star ⭐: ไส้บน > 2× body, ไส้ล่าง < 30% body → กลับตัวขาลง",
+        "Bullish Engulfing 🟢: แท่งบวกกลืนแท่งลบวันก่อน (body ≥ 110%)",
+        "Bearish Engulfing 🔴: แท่งลบกลืนแท่งบวกวันก่อน (body ≥ 110%)",
+        "Doji ➕: body < 10% ของ range — ลังเล จุดพลิก (ไม่นับว่าผ่าน รอ confirm)",
+        "Pin Bar 📌: ไส้ยาว > 60% ของ range ทั้งแท่ง",
+      ]},
+      { title: "⚡ Layer 4 — Momentum (RSI + MACD)", items: [
+        "BUY pass: RSI 40-65 (ยังมีที่ไป) + MACD Hist > 0 หรือกำลังขึ้น",
+        "Oversold Recovery: RSI < 35 + MACD กำลังเด้ง → pass (โอกาส bounce)",
+        "SELL pass: RSI 35-60 + MACD Hist < 0 หรือกำลังลง",
+        "RSI > 70 = Overbought → ไม่ผ่านสำหรับ BUY setup",
+        "RSI < 35 = Oversold → ไม่ผ่านสำหรับ SELL setup (เสี่ยงเด้ง)",
+      ]},
+      { title: "📊 Setup & Confidence", items: [
+        "BUY: Trend=UP + ผ่าน ≥ 3 layers → setup = BUY",
+        "SELL: Trend=DOWN + ผ่าน ≥ 3 layers → setup = SELL",
+        "WATCH_BUY / WATCH_SELL: ผ่านแค่ 2 layers → รอสัญญาณเพิ่ม",
+        "HIGH confidence: ผ่านครบ 4/4 layers",
+        "MEDIUM: 3/4 | LOW: 2/4 | NONE: 0-1/4",
+      ]},
+      { title: "💡 วิธีใช้งานแนะนำ", items: [
+        "กรอง: SET + min 3 Layer + Setup = BUY → หาหุ้นที่สมบูรณ์",
+        "กดที่แถวหุ้นเพื่อดู popup รายละเอียดทุก Layer",
+        "ใช้ร่วมกับ Analyze เพื่อดู Score, Entry, Stop Loss ก่อนตัดสินใจ",
+        "ข้อมูลอิง OHLCV + Indicator ปัจจุบัน (ไม่ใช่ Signal Database)",
+        "Cache 5 นาที — กดสแกนใหม่เพื่อรีเฟรชข้อมูล",
+      ]},
+    ],
+  },
+  {
     id: "scanner", icon: "🔍", label: "สแกนหุ้น", color: "var(--green)",
     purpose: "ค้นหาหุ้นตามเงื่อนไขทางเทคนิคที่กำหนดเอง — ยืดหยุ่นกว่า Radar ตรงที่ผู้ใช้กำหนด filter ได้เอง ทั้งแบบ preset formula และแบบเขียนเองได้",
     howBuilt: [
