@@ -29,7 +29,8 @@ def scan_stocks(request):
     since = timezone.now() - timedelta(days=days)
     qs = (Signal.objects
           .select_related("symbol")
-          .filter(direction="LONG", created_at__gte=since, score__gte=min_score)
+          .filter(created_at__gte=since, score__gte=min_score)
+          .exclude(signal_type__in=["WEAK_SELL", "STRONG_SELL"])
           .order_by("-score", "-created_at"))
 
     if exchange:
