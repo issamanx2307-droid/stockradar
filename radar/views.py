@@ -406,18 +406,36 @@ def scanner_view(request):
         sym = sym_map.get(sid)
         if not sym: continue
 
+        close_val     = float(r['close'])
+        stop_val      = float(r['stop_loss']) if not pd.isna(r.get('stop_loss')) else None
+        adx_val       = float(r['adx14'])      if not pd.isna(r.get('adx14'))     else None
+        vol_val       = float(r['volume'])     if not pd.isna(r.get('volume'))    else None
+        vol_avg_val   = float(r['volume_avg20']) if not pd.isna(r.get('volume_avg20')) else None
+        atr_val       = float(r['atr14'])      if not pd.isna(r.get('atr14'))     else None
+        atr_avg_val   = float(r['atr_avg30'])  if not pd.isna(r.get('atr_avg30')) else None
+
+        filter_adx_ok  = bool(adx_val and adx_val >= 25)
+        filter_vol_ok  = bool(vol_val and vol_avg_val and vol_val >= vol_avg_val * 1.5)
+        filter_atr_ok  = bool(atr_val and atr_avg_val and atr_val >= atr_avg_val)
+        risk_pct_val   = round((close_val - stop_val) / close_val * 100, 2) \
+                         if stop_val and stop_val > 0 and close_val > 0 else None
+
         row = {
-            "symbol":    sym.symbol,
-            "name":      sym.name,
-            "exchange":  sym.exchange,
-            "sector":    sym.sector,
-            "close":     float(r['close']),
-            "score":     float(r['score']),
-            "direction": r['direction'],
-            "signal_type": r['signal_type'],
-            "rsi":       float(r['rsi']) if not pd.isna(r.get('rsi')) else None,
-            "adx14":     float(r['adx14']) if not pd.isna(r.get('adx14')) else None,
-            "stop_loss": float(r['stop_loss']) if not pd.isna(r.get('stop_loss')) else None,
+            "symbol":             sym.symbol,
+            "name":               sym.name,
+            "exchange":           sym.exchange,
+            "sector":             sym.sector,
+            "close":              close_val,
+            "score":              float(r['score']),
+            "direction":          r['direction'],
+            "signal_type":        r['signal_type'],
+            "rsi":                float(r['rsi']) if not pd.isna(r.get('rsi')) else None,
+            "adx14":              adx_val,
+            "stop_loss":          stop_val,
+            "filter_adx":         filter_adx_ok,
+            "filter_volume":      filter_vol_ok,
+            "filter_volatility":  filter_atr_ok,
+            "risk_pct":           risk_pct_val,
         }
         rows.append(row)
 
