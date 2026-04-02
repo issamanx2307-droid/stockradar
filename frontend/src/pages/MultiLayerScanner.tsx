@@ -292,9 +292,12 @@ export default function MultiLayerScanner({ onOpenChart, onAnalyze }: {
 
   useEffect(() => { load() }, [load])
 
-  const filtered = (data?.results || []).filter(r =>
-    !search || r.symbol.includes(search.toUpperCase()) || r.name?.includes(search)
-  )
+  const filtered = (data?.results || []).filter(r => {
+    if (search && !r.symbol.includes(search.toUpperCase()) && !r.name?.includes(search)) return false
+    if (exchange === "US" && r.exchange !== "NASDAQ" && r.exchange !== "NYSE") return false
+    if (exchange && exchange !== "US" && r.exchange !== exchange) return false
+    return true
+  })
 
   return (
     <div className="fade-up">

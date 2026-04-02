@@ -638,4 +638,13 @@ def run_multilayer_scan(
             break
 
     results.sort(key=lambda x: (-x["layers_passed"], x["symbol"]))
+
+    # Safety filter — กันกรณี sym_map มี exchange ปนกัน
+    if exchange:
+        ex = exchange.upper()
+        if ex == "US":
+            results = [r for r in results if r.get("exchange") in ("NASDAQ", "NYSE")]
+        else:
+            results = [r for r in results if r.get("exchange") == ex]
+
     return results
