@@ -13,12 +13,14 @@ from rest_framework.response import Response
 @api_view(["GET"])
 def scan_stocks(request):
     """
-    GET /engine/scan/ — ดึง top signals จาก DB (เร็ว ไม่ต้อง scan real-time)
-    Params: exchange, top, min_score
+    GET /engine/scan/ — ดึง candidate symbols จาก Signal table แล้ว analyze() สด
+    ทำให้ card badge ตรงกับ detail panel เสมอ (ไม่ใช้ค่า stale จาก DB)
+    Params: exchange, top, min_score, capital, days
     """
-    from radar.models import Signal, Symbol
+    from radar.models import Signal
     from django.utils import timezone
     from datetime import timedelta
+    from engine_api.services.stock_service import analyze
 
     exchange  = request.query_params.get("exchange")
     top_n     = int(request.query_params.get("top", 20))
@@ -26,36 +28,59 @@ def scan_stocks(request):
     capital   = float(request.query_params.get("capital", 100_000))
     days      = int(request.query_params.get("days", 7))
 
+    # ── Step 1: ใช้ Signal table เป็น candidate list (เร็ว) ──────────────────
     since = timezone.now() - timedelta(days=days)
     qs = (Signal.objects
           .select_related("symbol")
-          .filter(direction="LONG", created_at__gte=since, score__gte=min_score)
+          .filter(created_at__gte=since)
+          .exclude(signal_type__in=["WEAK_SELL", "STRONG_SELL"])
           .order_by("-score", "-created_at"))
 
     if exchange:
         qs = qs.filter(symbol__exchange=exchange.upper())
 
-    qs = qs[:top_n]
-
-    out = []
+    # deduplicate: เก็บเฉพาะ signal ที่ดีที่สุดต่อ 1 symbol
+    # ดึง top_n * 3 candidates เผื่อบางตัว analyze แล้วคะแนนต่ำกว่า min_score
+    seen: set = set()
+    candidates: list[str] = []
     for s in qs:
-        from decision_engine.decision import calculate_position_size
-        entry     = float(s.price)
-        stop_loss = float(s.stop_loss) if s.stop_loss else entry * 0.95
-        size      = calculate_position_size(capital, 0.01, entry, stop_loss)
-        out.append({
-            "symbol":    s.symbol.symbol,
-            "score":     float(s.score),
-            "breakdown": {},
-            "decision":  s.signal_type,
-            "reasons":   [s.get_signal_type_display()],
-            "entry":     entry,
-            "stop_loss": stop_loss,
-            "risk_pct":  float(s.risk_pct) if s.risk_pct else round((entry-stop_loss)/entry*100,2),
-            "size":      size,
-            "rsi":       float(s.atr_at_signal) if s.atr_at_signal else None,
-            "adx":       float(s.adx_at_signal) if s.adx_at_signal else None,
-        })
+        sym = s.symbol.symbol
+        if sym not in seen:
+            seen.add(sym)
+            candidates.append(sym)
+        if len(candidates) >= top_n * 3:
+            break
+
+    # ── Step 2: analyze() สดทุกตัว (ใช้ Redis cache 60 วิ) ───────────────────
+    results = []
+    for sym in candidates:
+        try:
+            r = analyze(sym, capital=capital)
+            if not r or r.get("error"):
+                continue
+            score_data = r.get("score", {})
+            total = score_data.get("total_score", 0) if isinstance(score_data, dict) else 0
+            if total < min_score:
+                continue
+            results.append({
+                "symbol":    r["symbol"],
+                "score":     total,
+                "breakdown": score_data.get("breakdown", {}),
+                "decision":  r["decision"],
+                "reasons":   r["reasons"],
+                "entry":     r["entry"],
+                "stop_loss": r["stop_loss"],
+                "risk_pct":  r["risk_pct"],
+                "size":      r["position_size"],
+                "rsi":       r.get("rsi"),
+                "adx":       r.get("adx"),
+            })
+        except Exception:
+            continue
+
+    # เรียงตาม fresh score แล้วตัดเหลือ top_n
+    results.sort(key=lambda x: x["score"], reverse=True)
+    out = results[:top_n]
 
     return Response({"count": len(out), "results": out})
 
