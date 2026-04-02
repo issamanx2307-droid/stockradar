@@ -558,7 +558,7 @@ def run_multilayer_scan(
     from datetime import date, timedelta
 
     # โหลด symbols
-    sym_qs = Symbol.objects.filter(is_active=True)
+    sym_qs = Symbol.objects.all()
     if exchange:
         ex = exchange.upper()
         if ex == "US":
