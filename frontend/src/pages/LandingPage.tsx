@@ -128,9 +128,10 @@ interface TopSignal {
 
 function sigLabel(t: string) {
   const map: Record<string, string> = {
-    BUY: "ซื้อ", STRONG_BUY: "ซื้อแรง", GOLDEN_CROSS: "Golden Cross",
+    BUY: "คะแนนดี", STRONG_BUY: "คะแนนดีมาก", GOLDEN_CROSS: "Golden Cross",
     EMA_ALIGNMENT: "เทรนด์ขึ้น", BREAKOUT: "Breakout", OVERSOLD: "โซน Oversold",
-    SELL: "ขาย", STRONG_SELL: "ขายแรง", DEATH_CROSS: "Death Cross",
+    HOLD: "เฝ้าดู",
+    SELL: "คะแนนต่ำ", STRONG_SELL: "คะแนนต่ำมาก", DEATH_CROSS: "Death Cross",
     OVERBOUGHT: "โซน Overbought",
   }
   return map[t] ?? t
