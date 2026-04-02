@@ -770,7 +770,7 @@ export default function LandingPage() {
 
       {/* ── NEWS ────────────────────────────────────────────────────── */}
       {newsItems.length > 0 && (
-        <section style={{ padding: "60px 0", borderTop: "1px solid rgba(255,255,255,.05)" }}>
+        <section id="news" style={{ padding: "60px 0", borderTop: "1px solid rgba(255,255,255,.05)" }}>
           <div className="lp-container">
             <div style={{ marginBottom: 28 }}>
               <div style={{ fontSize: 13, color: "#00d4ff", fontWeight: 700, letterSpacing: 2, marginBottom: 8 }}>
