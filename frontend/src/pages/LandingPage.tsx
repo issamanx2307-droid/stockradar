@@ -128,10 +128,12 @@ interface TopSignal {
 
 function sigLabel(t: string) {
   const map: Record<string, string> = {
-    BUY: "BUY", STRONG_BUY: "STRONG", GOLDEN_CROSS: "CROSS",
-    EMA_ALIGNMENT: "ALIGN", BREAKOUT: "BREAK", OVERSOLD: "OVS",
+    BUY: "ซื้อ", STRONG_BUY: "ซื้อแรง", GOLDEN_CROSS: "Golden Cross",
+    EMA_ALIGNMENT: "เทรนด์ขึ้น", BREAKOUT: "Breakout", OVERSOLD: "โซน Oversold",
+    SELL: "ขาย", STRONG_SELL: "ขายแรง", DEATH_CROSS: "Death Cross",
+    OVERBOUGHT: "โซน Overbought",
   }
-  return map[t] ?? t.slice(0, 5)
+  return map[t] ?? t
 }
 function sigColor(d: string) { return d === "LONG" ? "#00e676" : "#ff5252" }
 
@@ -422,7 +424,7 @@ export default function LandingPage() {
                     animation: "blinkDot 1.2s ease-in-out infinite",
                   }} />
                   <span style={{ fontSize: 12, fontWeight: 800, color: "#e2e8f0", letterSpacing: 1 }}>
-                    ผลสแกนที่เข้าเกณฑ์
+                    ตัวอย่างผลสแกน
                   </span>
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
@@ -444,7 +446,7 @@ export default function LandingPage() {
                 fontSize: 10, fontWeight: 700, color: "#3a5a70", letterSpacing: 1,
                 borderBottom: "1px solid rgba(255,255,255,.04)",
               }}>
-                <span>#</span><span>หุ้น</span><span style={{ textAlign: "center" }}>SIGNAL</span><span style={{ textAlign: "right" }}>SCORE</span>
+                <span>#</span><span>หุ้น</span><span style={{ textAlign: "center" }}>SETUP</span><span style={{ textAlign: "right" }}>SCORE</span>
               </div>
 
               {/* Signal rows */}
