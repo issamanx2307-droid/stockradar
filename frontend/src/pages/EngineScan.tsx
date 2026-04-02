@@ -92,10 +92,11 @@ function AnalyzePanel({ symbol, onClose, onOpenChart }:
 
   return (
     <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,.65)",
-      display:"flex", alignItems:"center", justifyContent:"center", zIndex:1000, padding:20 }}
+      display:"flex", alignItems:"flex-start", justifyContent:"center", zIndex:1000,
+      padding:"24px 20px 50px", overflowY:"auto" }}
       onClick={onClose}>
       <div style={{ background:"var(--bg-surface,#1a2332)", border:"1px solid var(--border)",
-        borderRadius:16, padding:28, width:"100%", maxWidth:560, maxHeight:"85vh", overflowY:"auto" }}
+        borderRadius:16, padding:28, width:"100%", maxWidth:560, flexShrink:0 }}
         onClick={e => e.stopPropagation()}>
 
         <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:20 }}>

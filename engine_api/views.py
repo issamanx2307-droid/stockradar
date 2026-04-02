@@ -36,10 +36,19 @@ def scan_stocks(request):
     if exchange:
         qs = qs.filter(symbol__exchange=exchange.upper())
 
-    qs = qs[:top_n]
+    # deduplicate: เก็บเฉพาะ signal ที่ดีที่สุดต่อ 1 symbol
+    seen: set = set()
+    deduped = []
+    for s in qs:
+        sym = s.symbol.symbol
+        if sym not in seen:
+            seen.add(sym)
+            deduped.append(s)
+        if len(deduped) >= top_n:
+            break
 
     out = []
-    for s in qs:
+    for s in deduped:
         from decision_engine.decision import calculate_position_size
         entry     = float(s.price)
         stop_loss = float(s.stop_loss) if s.stop_loss else entry * 0.95
