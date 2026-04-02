@@ -25,7 +25,7 @@ TICKER_SYMBOLS = [
     {"symbol": "CL=F",     "label": "Oil (WTI)",  "type": "commodity"},
     {"symbol": "SI=F",     "label": "Silver",     "type": "commodity"},
     # FX
-    {"symbol": "THBUSD=X", "label": "USD/THB",    "type": "fx"},
+    {"symbol": "THB=X",    "label": "USD/THB",    "type": "fx"},
     {"symbol": "EURUSD=X", "label": "EUR/USD",    "type": "fx"},
     {"symbol": "JPY=X",    "label": "USD/JPY",    "type": "fx"},
     # Crypto
@@ -35,12 +35,11 @@ TICKER_SYMBOLS = [
 
 
 def _fetch_single(sym: str, meta: dict) -> dict | None:
-    """ดึงข้อมูลหุ้นเดี่ยว ด้วย download (เร็วกว่า fast_info บน VPS)"""
+    """ดึงข้อมูลดัชนี/สินทรัพย์เดี่ยว ด้วย Ticker().history() (single-level DataFrame)"""
     import yfinance as yf
     try:
-        df = yf.download(sym, period="2d", interval="1d",
-                         progress=False, auto_adjust=True)
-        if df is None or len(df) < 2:
+        df = yf.Ticker(sym).history(period="5d", interval="1d")
+        if df is None or df.empty:
             return None
         closes = df["Close"].dropna()
         if len(closes) < 2:
