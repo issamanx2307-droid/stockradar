@@ -161,10 +161,26 @@ def _generate_signals_for_symbol(sym_obj) -> int:
     signals_created = 0
     now = timezone.now()
 
+    # mapping signal_type → direction
+    SIGNAL_DIRECTION = {
+        "OVERSOLD":     "LONG",
+        "GOLDEN_CROSS": "LONG",
+        "BREAKOUT":     "LONG",
+        "BUY":          "LONG",
+        "STRONG_BUY":   "LONG",
+        "OVERBOUGHT":   "SHORT",
+        "DEATH_CROSS":  "SHORT",
+        "SELL":         "SHORT",
+        "WEAK_SELL":    "SHORT",
+        "STRONG_SELL":  "SHORT",
+    }
+
     def create_signal(signal_type, score):
+        direction = SIGNAL_DIRECTION.get(signal_type, "NEUTRAL")
         Signal.objects.create(
             symbol=sym_obj,
             signal_type=signal_type,
+            direction=direction,
             score=Decimal(str(score)),
             price=price_obj.close,
             created_at=now,
