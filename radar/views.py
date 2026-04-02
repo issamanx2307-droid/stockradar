@@ -596,8 +596,11 @@ def news_list(request):
 
 
 @api_view(["POST"])
+@permission_classes([IsAuthenticated])
 def news_fetch(request):
-    """POST /api/news/fetch/ — ดึงข่าวใหม่จาก RSS feeds ทันที"""
+    """POST /api/news/fetch/ — ดึงข่าวใหม่จาก RSS feeds ทันที (ต้อง login)"""
+    if not request.user.is_staff:
+        return Response({"error": "Staff only"}, status=403)
     try:
         from radar.news_fetcher import fetch_and_save_news
         stats = fetch_and_save_news(max_per_feed=30)

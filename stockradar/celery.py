@@ -46,4 +46,9 @@ app.conf.beat_schedule = {
         "task": "radar.fetch_set_fundamentals",
         "schedule": crontab(hour=20, minute=0),
     },
+    # ดึงข่าวหุ้นทุก 6 ชั่วโมง (6, 12, 18, 24 น. เวลาไทย = UTC+7)
+    "fetch-news-ทุก6ชม": {
+        "task": "radar.tasks.fetch_news",
+        "schedule": crontab(hour="23,5,11,17", minute=0),  # UTC: 23,5,11,17 = Thai 6,12,18,0
+    },
 }

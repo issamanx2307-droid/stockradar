@@ -250,7 +250,7 @@ export default function News({ onOpenChart }: { onOpenChart?: (s: string) => voi
   const [loading, setLoading] = useState(true)
   const [fetching, setFetching] = useState(false)
   const [filter, setFilter] = useState<"ALL" | "BULLISH" | "BEARISH" | "NEUTRAL">("ALL")
-  const [days, setDays] = useState(3)
+  const [days, setDays] = useState(7)
   const [search, setSearch] = useState("")
 
   const load = useCallback(async () => {
