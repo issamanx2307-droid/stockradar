@@ -221,12 +221,19 @@ def _generate_signals_for_symbol(sym_obj) -> int:
         create_signal("BREAKOUT", round(65 + min((vol / vol30 - 2) * 5, 25), 1))
 
     # Bullish: ราคาอยู่เหนือ EMA200
+    # score = 60 (base) + trend bonus (close/ema200) + momentum bonus (rsi)
+    # ตัวอย่าง: close/ema200=1.05, rsi=60 → 60 + 10 + 6 = 76
     if close > ema200 > 0 and rsi > 50:
-        create_signal("BUY", round(55 + rsi * 0.2, 1))
+        trend_bonus    = min((close / ema200 - 1) * 200, 20)   # 0-20 (cap 10% above EMA200)
+        momentum_bonus = (rsi - 50) * 0.3                       # 0-6 (for rsi 50-70)
+        create_signal("BUY", round(60 + trend_bonus + momentum_bonus, 1))
 
     # Bearish: ราคาต่ำกว่า EMA200
+    # score = 60 + trend penalty + RSI weakness
     elif close < ema200 and ema200 > 0 and rsi < 50:
-        create_signal("SELL", round(55 + (50 - rsi) * 0.3, 1))
+        trend_bonus    = min((1 - close / ema200) * 200, 20)   # 0-20
+        momentum_bonus = (50 - rsi) * 0.3                       # 0-6
+        create_signal("SELL", round(60 + trend_bonus + momentum_bonus, 1))
 
     return signals_created
 

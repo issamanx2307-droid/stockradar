@@ -270,7 +270,7 @@ class SignalListView(generics.ListAPIView):
     serializer_class = SignalSerializer
 
     def get_queryset(self):
-        qs = Signal.objects.select_related("symbol").order_by("-created_at","-score")
+        qs = Signal.objects.select_related("symbol").order_by("-score", "-created_at")
         p  = self.request.query_params
 
         if p.get("signal_type"): qs = qs.filter(signal_type=p["signal_type"].upper())
@@ -286,8 +286,18 @@ class SignalListView(generics.ListAPIView):
             since = timezone.now() - timedelta(days=int(p["days"]))
             qs = qs.filter(created_at__gte=since)
 
+        # dedup: เก็บเฉพาะ signal ที่ดีที่สุดต่อ 1 symbol
         limit = int(p.get("page_size", 200))
-        return qs[:limit]
+        seen: set = set()
+        deduped = []
+        for s in qs:
+            sym = s.symbol_id
+            if sym not in seen:
+                seen.add(sym)
+                deduped.append(s)
+            if len(deduped) >= limit:
+                break
+        return deduped
 
 
 # ─── Scanner (Pro) ────────────────────────────────────────────────────────────
