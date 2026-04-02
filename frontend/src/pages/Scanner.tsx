@@ -356,15 +356,12 @@ export default function Scanner({ onOpenChart, onAnalyze }: {
                             </td>
                             <td style={{ textAlign: "right" }}><RsiCell rsi={r.rsi} /></td>
                             <td style={{ textAlign: "right" }}>
-                              {/* @ts-ignore */}
                               <AdxCell adx={r.adx14} filterOk={r.filter_adx} />
                             </td>
                             <td>
-                              {/* @ts-ignore */}
                               <SignalBadge type={r.signal_type} direction={r.direction} />
                             </td>
                             <td style={{ textAlign: "right" }}>
-                              {/* @ts-ignore */}
                               <StopLossCell close={r.close} stopLoss={r.stop_loss} riskPct={r.risk_pct} />
                             </td>
                             <td>
@@ -379,7 +376,6 @@ export default function Scanner({ onOpenChart, onAnalyze }: {
                               }
                             </td>
                             <td style={{ paddingRight: 24 }}>
-                              {/* @ts-ignore */}
                               <FilterBadges vol={r.filter_volume} atr={r.filter_volatility} adx={r.filter_adx} />
                             </td>
                             <td style={{ paddingRight: 16 }}>

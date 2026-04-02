@@ -62,6 +62,10 @@ export interface ScannerResult {
   rsi?: number;
   adx14?: number;
   stop_loss?: number;
+  filter_adx?: boolean;
+  filter_volume?: boolean;
+  filter_volatility?: boolean;
+  risk_pct?: number;
 }
 
 export interface DashboardStats {

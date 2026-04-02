@@ -189,6 +189,7 @@ export default function Fundamental({ onOpenChart }: { onOpenChart?: (s: string)
     setLoading(true); setError(""); setData(null)
     try {
       const res = await fetch(`${BASE}/fundamental/${sym.trim().toUpperCase()}/`)
+      if (!res.ok) { setError(`ไม่พบข้อมูล (${res.status})`); return }
       const d   = await res.json()
       if (d.error) setError(d.error)
       else setData(d)

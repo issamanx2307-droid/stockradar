@@ -191,7 +191,7 @@ export default function Chart({ symbol: initSymbol }: { symbol?: string | null }
       if (mainRef.current)
         mainChart.current.applyOptions({ width: mainRef.current.clientWidth })
 
-    } catch (e) { console.error("Chart:", e) }
+    } catch (e) { console.error("Chart:", e); setNoData(true) }
     setLoading(false)
   }, [])
 
