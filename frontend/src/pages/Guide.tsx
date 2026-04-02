@@ -151,7 +151,7 @@ const MENU_GUIDE: MenuItem[] = [
     id: "engine_scan", icon: "🔥", label: "ตัวอย่างผลสแกนที่เข้าเกณฑ์", color: "#ff6d00",
     purpose: "ค้นหาหุ้นที่ดีที่สุดในขณะนี้โดยใช้ระบบคะแนน 5 ปัจจัย (5-Factor Scoring Engine) — ไม่ใช่แค่สัญญาณ แต่จัดอันดับว่าหุ้นไหนผ่านมากที่สุดในด้าน Trend, Momentum, Volume, Volatility และ Risk",
     howBuilt: [
-      "Engine ที่ /engine/scan/ ประมวลผลหุ้นทุกตัวตามช่วงเวลาที่เลือก คำนวณ Score 0–100",
+      "Engine ที่ /engine/scan/ ดึง candidate symbols จาก Signal table ในช่วงเวลาที่เลือก แล้วคำนวณ Score 0–100 สดด้วย analyze() pipeline เดียวกับหน้าวิเคราะห์หุ้น (Redis cache 60 วิ)",
       "Score Breakdown: Trend (max 40) + Momentum (max 25) + Volume (max 15) + Volatility (max 10) + Risk Penalty",
       "ผลแสดงเป็น Card Grid เรียงตาม Score สูงสุด พร้อม Autocomplete ค้นหารหัสหุ้น",
     ],
@@ -303,7 +303,7 @@ const MENU_GUIDE: MenuItem[] = [
     id: "portfolio", icon: "💼", label: "Portfolio", color: "#69f0ae",
     purpose: "สร้างพอร์ตอัตโนมัติ — กรอกเงินทุนที่มี ระบบจะสแกนหุ้นที่ผ่าน Score สูงสุด แล้วจัดสรรว่าควรซื้อหุ้นไหน เท่าไหร่ ด้วยเงินเท่าไหร่",
     howBuilt: [
-      "เรียก /engine/portfolio/ ส่ง: capital, exchange, min_score",
+      "เรียก /engine/portfolio/run/ ส่ง: capital, exchange, min_score",
       "Engine สแกนหุ้น → เรียงตาม Score → จัดสรรเงินตามสัดส่วน Score",
       "คำนวณ Position Size แต่ละตัว พร้อม Entry / Stop Loss",
     ],
@@ -335,7 +335,7 @@ const MENU_GUIDE: MenuItem[] = [
     id: "scanner", icon: "🔍", label: "สแกนหุ้น", color: "var(--green)",
     purpose: "ค้นหาหุ้นตามเงื่อนไขทางเทคนิคที่กำหนดเอง — ยืดหยุ่นกว่า Radar ตรงที่ผู้ใช้กำหนด filter ได้เอง ทั้งแบบ preset formula และแบบเขียนเองได้",
     howBuilt: [
-      "Backend /api/scanner/ รับ params แล้วกรองจาก Signal Database",
+      "Backend /api/scanner/ รับ params แล้วสแกนจาก Indicator table + PriceDaily โดยตรง (ไม่ใช่ Signal Database)",
       "รองรับ Formula Parser: rsi(14) < 30, close > ema(200), macd_hist > 0 ฯลฯ",
       "Filter เสริม: ADX, Volume, ATR (เปิด/ปิดได้)",
     ],
