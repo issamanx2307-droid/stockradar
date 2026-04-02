@@ -226,7 +226,8 @@ export default function Watchlist({ onOpenChart }: { onOpenChart?: (s: string) =
 
   // ── WebSocket for live prices ──
   useEffect(() => {
-    const ws = new WebSocket("ws://127.0.0.1:8000/ws/radar/")
+    const wsUrl = BASE.replace(/^http/, "ws").replace("/api", "") + "/ws/radar/"
+    const ws = new WebSocket(wsUrl)
     wsRef.current = ws
     ws.onmessage = (e) => {
       try {
@@ -282,7 +283,7 @@ export default function Watchlist({ onOpenChart }: { onOpenChart?: (s: string) =
 
   async function handleDeleteTrade(tradeId: number) {
     if (!confirm("ลบรายการซื้อนี้?")) return
-    await fetch(`${BASE}/watchlist/item/0/trade/`, { method: "DELETE" })  // placeholder
+    await fetch(`${BASE}/watchlist/trade/${tradeId}/`, { method: "DELETE" })
     await load()
   }
 

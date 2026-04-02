@@ -31,6 +31,7 @@ urlpatterns = [
     path("watchlist/add/",                      views.watchlist_add_item,        name="watchlist-add"),
     path("watchlist/item/<int:item_id>/",       views.watchlist_remove_item,     name="watchlist-remove"),
     path("watchlist/item/<int:item_id>/trade/", views.watchlist_add_trade,       name="watchlist-trade"),
+    path("watchlist/trade/<int:trade_id>/",    views.watchlist_delete_trade,     name="watchlist-trade-delete"),
     path("watchlist/item/<int:item_id>/calc-sell/", views.watchlist_calc_sell,   name="watchlist-calc"),
     path("watchlist/item/<int:item_id>/alert/", views.watchlist_update_alert,    name="watchlist-alert"),
     path("watchlist/history/",                  views.watchlist_portfolio_history, name="watchlist-history"),
