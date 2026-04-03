@@ -24,6 +24,17 @@ import pandas as pd
 logger = logging.getLogger(__name__)
 
 
+def _sf(val, default: float = 0.0) -> float:
+    """Safe float: แปลง None / NaN / invalid เป็น default (0 by default)"""
+    if val is None:
+        return default
+    try:
+        f = float(val)
+        return default if f != f else f   # f != f is True only for NaN
+    except (TypeError, ValueError):
+        return default
+
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # Layer 1 — Trend (EMA Alignment)
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -40,13 +51,14 @@ def analyze_trend(df: pd.DataFrame) -> dict:
         return {"pass": False, "signal": "NO_DATA", "detail": "ข้อมูลไม่เพียงพอ", "direction": "NEUTRAL"}
 
     row   = df.iloc[-1]
-    close = float(row["close"])
-    ema20 = float(row.get("ema20", 0) or 0)
-    ema50 = float(row.get("ema50", 0) or 0)
-    ema200= float(row.get("ema200", 0) or 0)
+    close = _sf(row.get("close"))
+    ema20 = _sf(row.get("ema20"))
+    ema50 = _sf(row.get("ema50"))
+    ema200= _sf(row.get("ema200"))
 
-    if ema20 <= 0 or ema50 <= 0 or ema200 <= 0:
-        return {"pass": False, "signal": "NO_DATA", "detail": "ยังไม่มีข้อมูล EMA", "direction": "NEUTRAL"}
+    if ema20 <= 0 or ema50 <= 0:
+        return {"pass": False, "signal": "NO_DATA", "detail": "ยังไม่มีข้อมูล EMA20/EMA50", "direction": "NEUTRAL"}
+    # EMA200 อาจไม่มีสำหรับหุ้นใหม่ — ใช้เป็น optional
 
     above_ema200 = close > ema200
     above_ema50  = close > ema50
@@ -164,7 +176,7 @@ def analyze_structure(df: pd.DataFrame, trend_direction: str = "NEUTRAL") -> dic
     if len(df) < 5:
         return {"pass": False, "signal": "NO_DATA", "detail": "ข้อมูลไม่เพียงพอ", "levels": [], "pivots": {}}
 
-    close   = float(df.iloc[-1]["close"])
+    close   = _sf(df.iloc[-1].get("close"))
     pivots  = _pivot_points(df)
     dyn_sr  = _find_dynamic_sr(df)
     all_levels = list(dyn_sr)
@@ -198,7 +210,7 @@ def analyze_structure(df: pd.DataFrame, trend_direction: str = "NEUTRAL") -> dic
     dist_to_s = (close - nearest_s["price"]) / close * 100 if nearest_s else 999
     dist_to_r = (nearest_r["price"] - close) / close * 100 if nearest_r else 999
 
-    NEAR_THRESHOLD  = 3.0   # ห่างแนวรับ/ต้าน ≤ 3% ถือว่า "ใกล้"
+    NEAR_THRESHOLD  = 5.0   # ห่างแนวรับ/ต้าน ≤ 5% ถือว่า "ใกล้"
     DANGER_THRESHOLD= 2.0   # ชนแนวต้านภายใน 2% ถือว่า "เสี่ยง"
 
     if trend_direction in ("BUY", "NEUTRAL"):
@@ -393,11 +405,13 @@ def analyze_momentum(df: pd.DataFrame, trend_direction: str = "NEUTRAL") -> dict
 
     row  = df.iloc[-1]
     prev = df.iloc[-2]
-    rsi  = float(row.get("rsi", 0) or 0)
-    macd_hist      = float(row.get("macd_hist", 0) or 0)
-    macd_hist_prev = float(prev.get("macd_hist", 0) or 0)
+    rsi            = _sf(row.get("rsi"))
+    macd_hist      = _sf(row.get("macd_hist"))
+    # prev row ไม่มี indicator — ใช้ 0 เป็น baseline (ดีกว่า NaN ที่ทำให้ comparison ล้ม)
+    macd_hist_prev_raw = _sf(prev.get("macd_hist"))
+    macd_hist_prev = macd_hist_prev_raw  # 0 ถ้าไม่มีข้อมูล
 
-    if rsi == 0:
+    if rsi <= 0:
         return {"pass": False, "signal": "NO_DATA", "detail": "ยังไม่มีข้อมูล RSI"}
 
     macd_rising  = macd_hist > macd_hist_prev

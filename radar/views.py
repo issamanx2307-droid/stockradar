@@ -1826,7 +1826,8 @@ def multi_layer_scan(request):
 
     cache_key = f"multilayer:{exchange}:{min_layers}:{setup}:{days}"
     cached    = cache.get(cache_key)
-    if cached:
+    # ป้องกัน cached 0-result: คืนเฉพาะถ้า count > 0
+    if cached and cached.get("count", 0) > 0:
         return Response(cached)
 
     results = run_multilayer_scan(
