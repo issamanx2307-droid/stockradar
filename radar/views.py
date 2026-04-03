@@ -1960,7 +1960,7 @@ def _try_ai_reply(user, admin_user, user_message: str):
         import google.generativeai as genai
         genai.configure(api_key=api_key)
         model = genai.GenerativeModel(
-            model_name="gemma-3n-e4b-it",
+            model_name="gemini-2.0-flash-lite",
             system_instruction=system_prompt,
         )
         # ส่ง history ยกเว้น message สุดท้าย (ใช้ send_message แทน)
