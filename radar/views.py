@@ -1903,6 +1903,55 @@ def vi_screen_api(request):
     })
 
 
+# ─── Multi-Layer Scanner ─────────────────────────────────────────────────────
+
+@api_view(["GET"])
+def multi_layer_scan(request):
+    """
+    GET /api/multi-layer/
+    Params:
+      exchange    = SET | NASDAQ | NYSE | US
+      min_layers  = 1-4 (default 2)
+      setup       = BUY | SELL | WATCH_BUY | WATCH_SELL
+      days        = ย้อนหลังกี่วัน (default 120)
+      page_size   = จำนวนผลลัพธ์ (default 100, max 300)
+    """
+    from radar.multilayer_engine import run_multilayer_scan
+
+    p           = request.query_params
+    exchange    = p.get("exchange", "")
+    setup       = p.get("setup", "")
+    try:
+        min_layers = max(1, min(4, int(p.get("min_layers", 2))))
+    except ValueError:
+        min_layers = 2
+    try:
+        days = max(60, min(365, int(p.get("days", 120))))
+    except ValueError:
+        days = 120
+    try:
+        page_size = max(1, min(300, int(p.get("page_size", 100))))
+    except ValueError:
+        page_size = 100
+
+    cache_key = f"multilayer:{exchange}:{min_layers}:{setup}:{days}"
+    cached    = cache.get(cache_key)
+    if cached:
+        return Response(cached)
+
+    results = run_multilayer_scan(
+        exchange=exchange or None,
+        min_layers=min_layers,
+        setup_filter=setup or None,
+        days=days,
+        limit=page_size,
+    )
+
+    resp = {"count": len(results), "results": results}
+    cache.set(cache_key, resp, 300)   # cache 5 นาที
+    return Response(resp)
+
+
 # ─── Chat System (Admin ↔ User) ───────────────────────────────────────────────
 
 def _get_admin_user():

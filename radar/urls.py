@@ -56,6 +56,8 @@ urlpatterns = [
     path("admin/refresh-snapshot/",    views.admin_refresh_snapshot, name="admin-refresh-snapshot"),
     # ── VI Screener ──
     path("vi-screen/",                 views.vi_screen_api,          name="vi-screen"),
+    # ── Multi-Layer Scanner ──
+    path("multi-layer/",               views.multi_layer_scan,       name="multi-layer"),
     # ── Chat System ──
     path("chat/send/",                 views.chat_send,              name="chat-send"),
     path("chat/messages/",             views.chat_messages,          name="chat-messages"),
