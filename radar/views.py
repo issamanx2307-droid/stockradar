@@ -1975,8 +1975,9 @@ def _try_ai_reply(user, admin_user, user_message: str):
                 body=ai_text,
                 is_ai_response=True,
             )
-    except Exception:
-        pass  # ถ้า AI error ผู้ใช้จะรอ admin ตอบเอง
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).error("AI reply error: %s", e)
 
 
 @api_view(["GET"])
