@@ -838,6 +838,7 @@ class ChatMessage(models.Model):
     body     = models.TextField(verbose_name="ข้อความ")
     is_read  = models.BooleanField(default=False, db_index=True,
                                    verbose_name="อ่านแล้ว")
+    is_ai_response = models.BooleanField(default=False, verbose_name="ตอบโดย AI")
     created_at = models.DateTimeField(auto_now_add=True, db_index=True)
 
     class Meta:
@@ -851,3 +852,27 @@ class ChatMessage(models.Model):
 
     def __str__(self):
         return f"{self.sender.username} → {self.receiver.username}: {self.body[:40]}"
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Site Settings
+# ─────────────────────────────────────────────────────────────────────────────
+
+class SiteSetting(models.Model):
+    ai_chat_enabled = models.BooleanField(
+        default=False,
+        verbose_name="เปิดใช้ AI ในแชท",
+        help_text="เมื่อเปิด ระบบจะตอบแชทผู้ใช้โดยอัตโนมัติด้วย Claude AI",
+    )
+
+    class Meta:
+        verbose_name        = "ตั้งค่าระบบ"
+        verbose_name_plural = "ตั้งค่าระบบ"
+
+    def __str__(self):
+        return f"SiteSetting (AI Chat: {'เปิด' if self.ai_chat_enabled else 'ปิด'})"
+
+    @classmethod
+    def get(cls):
+        obj, _ = cls.objects.get_or_create(pk=1)
+        return obj
