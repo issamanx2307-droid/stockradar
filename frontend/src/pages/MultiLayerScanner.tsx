@@ -46,11 +46,11 @@ const SETUP_COLOR: Record<string, string> = {
   NEUTRAL:    "var(--text-muted)",
 }
 const SETUP_LABEL: Record<string, string> = {
-  BUY:        "🟢 BUY",
-  SELL:       "🔴 SELL",
-  WATCH_BUY:  "👀 เฝ้าดู (Long)",
-  WATCH_SELL: "👀 เฝ้าดู (Short)",
-  NEUTRAL:    "— Neutral",
+  BUY:        "คะแนนดี",
+  SELL:       "คะแนนต่ำ",
+  WATCH_BUY:  "เฝ้าดู",
+  WATCH_SELL: "เฝ้าดู",
+  NEUTRAL:    "เฝ้าดู",
 }
 const CONF_COLOR: Record<string, string> = {
   HIGH:   "var(--green)",
@@ -380,10 +380,10 @@ export default function MultiLayerScanner({ onOpenChart, onAnalyze }: {
               <select className="filter-select" style={{ width: "100%" }}
                 value={setup} onChange={e => setSetup(e.target.value)}>
                 <option value="">ทั้งหมด</option>
-                <option value="BUY">🟢 BUY</option>
-                <option value="SELL">🔴 SELL</option>
-                <option value="WATCH_BUY">👀 เฝ้าดู Long</option>
-                <option value="WATCH_SELL">👀 เฝ้าดู Short</option>
+                <option value="BUY">คะแนนดี</option>
+                <option value="SELL">คะแนนต่ำ</option>
+                <option value="WATCH_BUY">เฝ้าดู</option>
+                <option value="WATCH_SELL">เฝ้าดู (ขาลง)</option>
               </select>
             </div>
 
