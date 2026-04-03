@@ -112,7 +112,7 @@ export default function Subscription() {
   useEffect(() => {
     Promise.all([
       fetch(`${API_BASE}/subscription/plans/`).then(r => r.json()),
-      fetch(`${API_BASE}/subscription/status/`).then(r => r.json()),
+      fetch(`${API_BASE}/subscription/`, { headers: { Authorization: `Token ${localStorage.getItem("sr_token") || ""}` } }).then(r => r.json()),
     ]).then(([plansData, statusData]) => {
       setPlans(plansData.plans || {})
       setStatus(statusData)
