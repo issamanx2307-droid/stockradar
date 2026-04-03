@@ -301,7 +301,7 @@ class ChatMessageAdmin(admin.ModelAdmin):
 
     def reply_btn(self, obj):
         url = (
-            f"/admin/radar/chatmessage/add/"
+            f"/mantapa/radar/chatmessage/add/"
             f"?receiver={obj.sender.id}"
             f"&sender={obj.receiver.id}"
         )
