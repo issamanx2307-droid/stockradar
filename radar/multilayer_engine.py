@@ -516,13 +516,17 @@ def analyze_symbol_multilayer(df: pd.DataFrame, symbol: str = "") -> dict:
     ])
 
     # Setup
-    if direction in ("BUY",) and passed >= 3:
+    if direction == "BUY" and passed == 4:
+        setup = "STRONG_BUY"
+    elif direction == "BUY" and passed == 3:
         setup = "BUY"
-    elif direction in ("SELL",) and passed >= 3:
+    elif direction == "SELL" and passed == 4:
+        setup = "STRONG_SELL"
+    elif direction == "SELL" and passed == 3:
         setup = "SELL"
-    elif direction in ("BUY",) and passed == 2:
+    elif direction == "BUY" and passed == 2:
         setup = "WATCH_BUY"
-    elif direction in ("SELL",) and passed == 2:
+    elif direction == "SELL" and passed == 2:
         setup = "WATCH_SELL"
     else:
         setup = "NEUTRAL"

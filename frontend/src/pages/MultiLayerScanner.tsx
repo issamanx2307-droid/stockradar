@@ -39,18 +39,22 @@ interface MLResponse {
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 const SETUP_COLOR: Record<string, string> = {
-  BUY:        "var(--green)",
-  SELL:       "var(--red)",
-  WATCH_BUY:  "var(--yellow)",
-  WATCH_SELL: "#ff9800",
-  NEUTRAL:    "var(--text-muted)",
+  STRONG_BUY:  "#00e676",
+  BUY:         "var(--green)",
+  SELL:        "var(--red)",
+  STRONG_SELL: "#ff1744",
+  WATCH_BUY:   "var(--yellow)",
+  WATCH_SELL:  "#ff9800",
+  NEUTRAL:     "var(--text-muted)",
 }
 const SETUP_LABEL: Record<string, string> = {
-  BUY:        "คะแนนดี",
-  SELL:       "คะแนนต่ำ",
-  WATCH_BUY:  "เฝ้าดู",
-  WATCH_SELL: "เฝ้าดู",
-  NEUTRAL:    "เฝ้าดู",
+  STRONG_BUY:  "คะแนนดีมาก",
+  BUY:         "คะแนนดี",
+  SELL:        "คะแนนต่ำ",
+  STRONG_SELL: "คะแนนต่ำมาก",
+  WATCH_BUY:   "เฝ้าดู",
+  WATCH_SELL:  "เฝ้าดู",
+  NEUTRAL:     "เฝ้าดู",
 }
 const CONF_COLOR: Record<string, string> = {
   HIGH:   "var(--green)",
@@ -380,8 +384,10 @@ export default function MultiLayerScanner({ onOpenChart, onAnalyze }: {
               <select className="filter-select" style={{ width: "100%" }}
                 value={setup} onChange={e => setSetup(e.target.value)}>
                 <option value="">ทั้งหมด</option>
+                <option value="STRONG_BUY">คะแนนดีมาก</option>
                 <option value="BUY">คะแนนดี</option>
                 <option value="SELL">คะแนนต่ำ</option>
+                <option value="STRONG_SELL">คะแนนต่ำมาก</option>
                 <option value="WATCH_BUY">เฝ้าดู</option>
                 <option value="WATCH_SELL">เฝ้าดู (ขาลง)</option>
               </select>
