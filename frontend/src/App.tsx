@@ -22,6 +22,7 @@ import Fundamental from "./pages/Fundamental"
 import VIScreen from "./pages/VIScreen"
 import MultiLayerScanner from "./pages/MultiLayerScanner"
 import Chat from "./pages/Chat"
+import Subscription from "./pages/Subscription"
 import { AutoTermHighlight, TermAssistantProvider, TermAssistantToggle } from "./components/TermAssistant"
 import TickerTape from "./components/TickerTape"
 import "./App.css"
@@ -256,6 +257,7 @@ function AppInner() {
             {page === "profile"      && <Profile />}
             {page === "contact"      && <Contact />}
             {page === "chat"         && <Chat onRead={() => setChatUnread(0)} />}
+            {page === "subscription" && <Subscription />}
           </AutoTermHighlight>
         </main>
       </div>
