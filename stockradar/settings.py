@@ -279,6 +279,13 @@ IMPORT_API_TOKEN = os.environ.get("IMPORT_API_TOKEN", "")
 SUPPORTED_EXCHANGES = ["SET", "NASDAQ", "NYSE"]
 PRICE_LOAD_BATCH_SIZE = int(os.environ.get("PRICE_LOAD_BATCH_SIZE", 50))
 
+# Google AI Studio API (ใช้ใน AI Chat — Gemma 3n E4B)
+# ตั้งค่าใน .env: GOOGLE_AI_API_KEY=AIza...
+GOOGLE_AI_API_KEY = os.environ.get("GOOGLE_AI_API_KEY", "")
+
+# จำกัด AI chat: กี่ข้อความต่อ user ต่อวัน (0 = ไม่จำกัด)
+AI_CHAT_DAILY_LIMIT = int(os.environ.get("AI_CHAT_DAILY_LIMIT", 30))
+
 # ---------------------------------------------------------------------------
 # Jazzmin Settings (Admin UI Customization)
 # ---------------------------------------------------------------------------

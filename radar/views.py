@@ -1881,14 +1881,102 @@ def chat_send(request):
             return Response({"error": "ไม่พบแอดมิน"}, status=503)
 
     msg = ChatMessage.objects.create(sender=request.user, receiver=receiver, body=body)
+
+    # ── AI Auto-Reply (เฉพาะเมื่อ user ธรรมดาส่ง + AI เปิดอยู่) ──────────────
+    if not is_admin:
+        _try_ai_reply(request.user, receiver, body)
+
     return Response({
-        "id":         msg.id,
-        "body":       msg.body,
-        "sender_id":  msg.sender_id,
-        "sender":     msg.sender.username,
-        "is_admin_msg": is_admin,
-        "created_at": msg.created_at.isoformat(),
+        "id":             msg.id,
+        "body":           msg.body,
+        "sender_id":      msg.sender_id,
+        "sender":         msg.sender.username,
+        "is_admin_msg":   is_admin,
+        "is_ai_response": False,
+        "created_at":     msg.created_at.isoformat(),
     }, status=201)
+
+
+def _try_ai_reply(user, admin_user, user_message: str):
+    """
+    เรียก Gemma 3n E4B (Google AI Studio) และบันทึก AI reply เป็น ChatMessage
+    """
+    from django.conf import settings
+    from radar.models import SiteSetting
+
+    setting = SiteSetting.get()
+    if not setting.ai_chat_enabled:
+        return
+
+    api_key = getattr(settings, "GOOGLE_AI_API_KEY", "")
+    if not api_key:
+        return
+
+    # Rate limit: ตรวจสอบจำนวน AI reply ที่ user ได้รับวันนี้
+    daily_limit = getattr(settings, "AI_CHAT_DAILY_LIMIT", 30)
+    if daily_limit > 0:
+        import datetime
+        today = datetime.date.today()
+        ai_today = ChatMessage.objects.filter(
+            receiver=user,
+            is_ai_response=True,
+            created_at__date=today,
+        ).count()
+        if ai_today >= daily_limit:
+            return
+
+    # ดึงประวัติสนทนาล่าสุด (10 ข้อความ) เป็น context
+    from django.db.models import Q
+    history_qs = ChatMessage.objects.filter(
+        Q(sender=user, receiver=admin_user) |
+        Q(sender=admin_user, receiver=user)
+    ).order_by("-created_at")[:10]
+
+    # แปลงเป็น format ที่ Google Generative AI ต้องการ
+    history = []
+    for h in reversed(list(history_qs)):
+        role = "user" if h.sender_id == user.id else "model"
+        history.append({"role": role, "parts": [{"text": h.body}]})
+
+    # เพิ่มข้อความล่าสุดถ้ายังไม่อยู่ใน history
+    if not history or history[-1]["parts"][0]["text"] != user_message:
+        history.append({"role": "user", "parts": [{"text": user_message}]})
+
+    system_prompt = (
+        "คุณคือ AI assistant ของ StockRadar (radarhoon.com) "
+        "ระบบสแกนและวิเคราะห์หุ้นไทย\n"
+        "หน้าที่ของคุณ:\n"
+        "- ช่วยผู้ใช้เข้าใจฟีเจอร์ต่างๆ ของ StockRadar "
+        "(Multi-Layer Scanner, Radar, วิเคราะห์หุ้น, Backtest, Stop Loss)\n"
+        "- อธิบาย indicator ทางเทคนิค (RSI, MACD, EMA, ATR, ADX, BB)\n"
+        "- อธิบายระบบคะแนน: คะแนนดีมาก / คะแนนดี / เฝ้าดู / คะแนนต่ำ / คะแนนต่ำมาก\n"
+        "- ตอบเป็นภาษาไทย กระชับ ตรงประเด็น\n"
+        "ข้อห้าม:\n"
+        "- ห้ามแนะนำหุ้นเฉพาะเจาะจงให้ซื้อหรือขาย\n"
+        "- ไม่ใช่ที่ปรึกษาการเงิน ทุกการตัดสินใจลงทุนเป็นความรับผิดชอบของผู้ใช้"
+    )
+
+    try:
+        import google.generativeai as genai
+        genai.configure(api_key=api_key)
+        model = genai.GenerativeModel(
+            model_name="gemma-3n-e4b-it",
+            system_instruction=system_prompt,
+        )
+        # ส่ง history ยกเว้น message สุดท้าย (ใช้ send_message แทน)
+        chat_history = history[:-1] if len(history) > 1 else []
+        chat = model.start_chat(history=chat_history)
+        response = chat.send_message(user_message)
+        ai_text = response.text.strip() if response.text else ""
+        if ai_text:
+            ChatMessage.objects.create(
+                sender=admin_user,
+                receiver=user,
+                body=ai_text,
+                is_ai_response=True,
+            )
+    except Exception:
+        pass  # ถ้า AI error ผู้ใช้จะรอ admin ตอบเอง
 
 
 @api_view(["GET"])
@@ -1929,14 +2017,15 @@ def chat_messages(request):
 
     data = [
         {
-            "id":           m.id,
-            "body":         m.body,
-            "sender_id":    m.sender_id,
-            "sender":       m.sender.username,
-            "is_mine":      m.sender_id == request.user.id,
-            "is_admin_msg": m.sender.is_staff or m.sender.is_superuser,
-            "is_read":      m.is_read,
-            "created_at":   m.created_at.isoformat(),
+            "id":             m.id,
+            "body":           m.body,
+            "sender_id":      m.sender_id,
+            "sender":         m.sender.username,
+            "is_mine":        m.sender_id == request.user.id,
+            "is_admin_msg":   m.sender.is_staff or m.sender.is_superuser,
+            "is_ai_response": getattr(m, "is_ai_response", False),
+            "is_read":        m.is_read,
+            "created_at":     m.created_at.isoformat(),
         }
         for m in msgs
     ]
