@@ -1957,16 +1957,17 @@ def _try_ai_reply(user, admin_user, user_message: str):
     )
 
     try:
-        import google.generativeai as genai
-        genai.configure(api_key=api_key)
-        model = genai.GenerativeModel(
-            model_name="gemini-1.5-flash",
-            system_instruction=system_prompt,
+        from google import genai as google_genai
+        from google.genai import types as genai_types
+        client = google_genai.Client(api_key=api_key)
+        response = client.models.generate_content(
+            model="gemini-2.0-flash",
+            contents=history,
+            config=genai_types.GenerateContentConfig(
+                system_instruction=system_prompt,
+                temperature=0.7,
+            ),
         )
-        # ส่ง history ยกเว้น message สุดท้าย (ใช้ send_message แทน)
-        chat_history = history[:-1] if len(history) > 1 else []
-        chat = model.start_chat(history=chat_history)
-        response = chat.send_message(user_message)
         ai_text = response.text.strip() if response.text else ""
         if ai_text:
             ChatMessage.objects.create(
