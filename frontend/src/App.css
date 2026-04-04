@@ -905,47 +905,53 @@ body {
     z-index: 200;
   }
 
-  /* main-content เป็น scroll container หลักบน mobile */
+  /* main-content: flex column, fixed height = เต็มหน้าจอใต้ navbar */
   .main-content {
-    margin-top: 56px;
-    height: calc(100vh - 56px);
-    overflow-y: auto;
-    overflow-x: hidden;
+    margin-top: 56px !important;
     padding-top: 0 !important;
     padding-bottom: 0 !important;
+    height: calc(100vh - 56px) !important;
+    overflow: hidden !important;
+    display: flex !important;
+    flex-direction: column !important;
   }
 
-  /* Warning banner sticky ติดบน main-content */
+  /* Warning banner: flex-shrink ไม่ scroll หนี */
   .legal-banner {
-    position: sticky !important;
-    top: 0 !important;
+    position: static !important;
+    flex-shrink: 0;
+    margin: 0 !important;
+    border-radius: 0 !important;
     z-index: 150 !important;
   }
 
-  /* Chat header — ไม่ sticky บน mobile เพื่อไม่ทับข้อความ */
+  /* Chat outer: flex: 1 เต็มพื้นที่ที่เหลือ */
+  .chat-outer {
+    flex: 1 !important;
+    min-height: 0 !important;
+    height: auto !important;
+    overflow: hidden !important;
+    padding: 6px 8px 0 !important;
+  }
+
+  /* Chat header: ไม่ sticky แค่ normal flow */
   .chat-header {
     position: static !important;
+    flex-shrink: 0;
   }
 
-  /* Chat outer — ให้ไหลตามธรรมชาติ */
-  .chat-outer {
-    height: auto !important;
-    overflow: visible !important;
-    padding: 0 8px 8px !important;
-  }
-
-  /* Messages — ไหลตามธรรมชาติ ไม่ scroll ซ้อน */
+  /* Messages: flex: 1 scroll ภายใน */
   .chat-messages {
+    flex: 1 !important;
+    min-height: 0 !important;
     height: auto !important;
-    overflow-y: visible !important;
-    min-height: 100px;
+    overflow-y: auto !important;
   }
 
-  /* Input bar — ติดล่าง */
+  /* Input bar: ติดล่างเสมอ (flexbox จัดให้) */
   .chat-input-bar {
-    position: sticky !important;
-    bottom: 0 !important;
-    z-index: 100;
+    position: static !important;
+    flex-shrink: 0;
   }
 
   .sidebar-logo { display: none; }
