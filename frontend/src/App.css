@@ -905,42 +905,54 @@ body {
     z-index: 200;
   }
 
-  /* main-content: flex column, fixed height = เต็มหน้าจอใต้ navbar */
+  /* main-content: margin ใต้ navbar, ไม่ scroll ตัวเอง */
   .main-content {
     margin-top: 56px !important;
-    padding-top: 0 !important;
-    padding-bottom: 0 !important;
+    padding: 0 !important;
     height: calc(100vh - 56px) !important;
     overflow: hidden !important;
+  }
+
+  /* Warning banner: fixed ใต้ navbar */
+  .legal-banner {
+    position: fixed !important;
+    top: 56px !important;
+    left: 0 !important;
+    right: 0 !important;
+    z-index: 190 !important;
+    margin: 0 !important;
+    border-radius: 0 !important;
+    padding: 5px 12px !important;
+    font-size: 10px !important;
+    line-height: 1.5 !important;
+    /* จำกัด 2 บรรทัด = ~40px */
+    display: -webkit-box !important;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden !important;
+  }
+
+  /* Chat outer: fixed ใต้ banner */
+  .chat-outer {
+    position: fixed !important;
+    top: 96px !important;   /* 56 navbar + 40 banner */
+    bottom: 34px !important; /* เหนือ ticker tape */
+    left: 0 !important;
+    right: 0 !important;
+    height: auto !important;
+    overflow: hidden !important;
+    padding: 0 8px !important;
     display: flex !important;
     flex-direction: column !important;
   }
 
-  /* Warning banner: flex-shrink ไม่ scroll หนี */
-  .legal-banner {
-    position: static !important;
-    flex-shrink: 0;
-    margin: 0 !important;
-    border-radius: 0 !important;
-    z-index: 150 !important;
-  }
-
-  /* Chat outer: flex: 1 เต็มพื้นที่ที่เหลือ */
-  .chat-outer {
-    flex: 1 !important;
-    min-height: 0 !important;
-    height: auto !important;
-    overflow: hidden !important;
-    padding: 6px 8px 0 !important;
-  }
-
-  /* Chat header: ไม่ sticky แค่ normal flow */
+  /* Chat header: อยู่บนสุดของ chat-outer */
   .chat-header {
     position: static !important;
     flex-shrink: 0;
   }
 
-  /* Messages: flex: 1 scroll ภายใน */
+  /* Messages: scroll เฉพาะส่วนนี้ */
   .chat-messages {
     flex: 1 !important;
     min-height: 0 !important;
@@ -948,7 +960,7 @@ body {
     overflow-y: auto !important;
   }
 
-  /* Input bar: ติดล่างเสมอ (flexbox จัดให้) */
+  /* Input bar: ติดล่างสุดของ chat-outer */
   .chat-input-bar {
     position: static !important;
     flex-shrink: 0;
