@@ -1956,25 +1956,29 @@ def _try_ai_reply(user, admin_user, user_message: str):
         "- ไม่ใช่ที่ปรึกษาการเงิน ทุกการตัดสินใจลงทุนเป็นความรับผิดชอบของผู้ใช้"
     )
 
-    import logging as _logging
-    _log = _logging.getLogger(__name__)
     try:
-        import requests as _requests
-        # ดู models ที่ใช้ได้กับ API key นี้
-        models_url = f"https://generativelanguage.googleapis.com/v1beta/models?key={api_key}&pageSize=50"
-        models_resp = _requests.get(models_url, timeout=10)
-        if models_resp.ok:
-            all_models = models_resp.json().get("models", [])
-            gemini_models = [
-                m["name"] for m in all_models
-                if "gemini" in m.get("name", "").lower()
-                and "generateContent" in m.get("supportedGenerationMethods", [])
-            ]
-            _log.info("Available Gemini models: %s", gemini_models)
-        else:
-            _log.error("Cannot list models: %s", models_resp.text[:300])
+        from google import genai as google_genai
+        from google.genai import types as genai_types
+        client = google_genai.Client(api_key=api_key)
+        response = client.models.generate_content(
+            model="gemini-2.5-flash",
+            contents=history,
+            config=genai_types.GenerateContentConfig(
+                system_instruction=system_prompt,
+                temperature=0.7,
+            ),
+        )
+        ai_text = response.text.strip() if response.text else ""
+        if ai_text:
+            ChatMessage.objects.create(
+                sender=admin_user,
+                receiver=user,
+                body=ai_text,
+                is_ai_response=True,
+            )
     except Exception as e:
-        _log.error("Model list error: %s", e)
+        import logging
+        logging.getLogger(__name__).error("AI reply error: %s", e)
 
 
 @api_view(["GET"])
