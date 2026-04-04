@@ -1963,13 +1963,17 @@ def _try_ai_reply(user, admin_user, user_message: str):
             api_key=api_key,
             http_options={"api_version": "v1"},
         )
+        # v1 API ไม่รองรับ system_instruction field
+        # inject system prompt เป็นคู่ user/model แรกใน history แทน
+        system_turn = [
+            {"role": "user", "parts": [{"text": f"[คำแนะนำระบบ] {system_prompt}"}]},
+            {"role": "model", "parts": [{"text": "เข้าใจแล้วครับ ฉันพร้อมช่วยเหลือเกี่ยวกับ StockRadar"}]},
+        ]
+        full_contents = system_turn + history
         response = client.models.generate_content(
             model="gemini-1.5-flash",
-            contents=history,
-            config=genai_types.GenerateContentConfig(
-                system_instruction=system_prompt,
-                temperature=0.7,
-            ),
+            contents=full_contents,
+            config=genai_types.GenerateContentConfig(temperature=0.7),
         )
         ai_text = response.text.strip() if response.text else ""
         if ai_text:
