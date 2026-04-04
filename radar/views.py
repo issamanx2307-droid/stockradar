@@ -12,11 +12,12 @@ from django.db import models
 from django.db.models import Subquery, OuterRef
 from django.utils import timezone
 from rest_framework import generics, filters
-from rest_framework.decorators import api_view, permission_classes
+from rest_framework.decorators import api_view, permission_classes, throttle_classes
 from rest_framework.response import Response
 from rest_framework.permissions import AllowAny
 
 from .decorators import pro_required
+from .throttles import ScannerThrottle, BacktestThrottle
 from .models import (
     Symbol,
     PriceDaily,
@@ -205,21 +206,34 @@ def dashboard_summary(request):
 
 class SymbolListView(generics.ListAPIView):
     serializer_class = SymbolSerializer
-    filter_backends  = [filters.SearchFilter, filters.OrderingFilter]
-    search_fields    = ["symbol", "name", "sector"]
+    filter_backends  = [filters.OrderingFilter]
     ordering_fields  = ["symbol", "exchange", "sector"]
     ordering         = ["symbol"]
 
     def get_queryset(self):
+        from django.db.models import Case, When, IntegerField, Value, Q
         qs = Symbol.objects.all()
         p  = self.request.query_params
         ex = p.get("exchange")
         sc = p.get("sector")
+        search = p.get("search", "").strip()
         if ex:
             qs = qs.filter(exchange__in=["NASDAQ","NYSE"]) if ex.upper()=="US" \
                  else qs.filter(exchange=ex.upper())
         if sc:
             qs = qs.filter(sector__icontains=sc)
+        if search:
+            qs = qs.filter(
+                Q(symbol__icontains=search) | Q(name__icontains=search)
+            ).annotate(
+                _priority=Case(
+                    When(symbol__iexact=search, then=Value(0)),
+                    When(symbol__istartswith=search, then=Value(1)),
+                    When(symbol__icontains=search, then=Value(2)),
+                    default=Value(3),
+                    output_field=IntegerField(),
+                )
+            ).order_by("_priority", "symbol")
         return qs
 
     def get_paginator(self):
@@ -269,7 +283,7 @@ class SignalListView(generics.ListAPIView):
     serializer_class = SignalSerializer
 
     def get_queryset(self):
-        qs = Signal.objects.select_related("symbol").order_by("-created_at","-score")
+        qs = Signal.objects.select_related("symbol").order_by("-score", "-created_at")
         p  = self.request.query_params
 
         if p.get("signal_type"): qs = qs.filter(signal_type=p["signal_type"].upper())
@@ -285,13 +299,24 @@ class SignalListView(generics.ListAPIView):
             since = timezone.now() - timedelta(days=int(p["days"]))
             qs = qs.filter(created_at__gte=since)
 
+        # dedup: เก็บเฉพาะ signal ที่ดีที่สุดต่อ 1 symbol
         limit = int(p.get("page_size", 200))
-        return qs[:limit]
+        seen: set = set()
+        deduped = []
+        for s in qs:
+            sym = s.symbol_id
+            if sym not in seen:
+                seen.add(sym)
+                deduped.append(s)
+            if len(deduped) >= limit:
+                break
+        return deduped
 
 
 # ─── Scanner (Pro) ────────────────────────────────────────────────────────────
 
 @api_view(["GET"])
+@throttle_classes([ScannerThrottle])
 def scanner_view(request):
     """
     GET /api/scanner/
@@ -433,6 +458,7 @@ def scanner_view(request):
 # ─── Scanner Run ──────────────────────────────────────────────────────────────
 
 @api_view(["POST"])
+@throttle_classes([ScannerThrottle])
 def run_scanner_api(request):
     """POST /api/scanner/run/ — พร้อม WebSocket broadcast"""
     exchange = request.data.get("exchange")
@@ -461,6 +487,7 @@ def run_scanner_api(request):
 # ─── Backtest ─────────────────────────────────────────────────────────────────
 
 @api_view(["POST"])
+@throttle_classes([BacktestThrottle])
 @pro_required
 def run_backtest_api(request):
     """POST /api/backtest/"""
@@ -610,8 +637,11 @@ def news_list(request):
 
 
 @api_view(["POST"])
+@permission_classes([IsAuthenticated])
 def news_fetch(request):
-    """POST /api/news/fetch/ — ดึงข่าวใหม่จาก RSS feeds ทันที"""
+    """POST /api/news/fetch/ — ดึงข่าวใหม่จาก RSS feeds ทันที (ต้อง login)"""
+    if not request.user.is_staff:
+        return Response({"error": "Staff only"}, status=403)
     try:
         from radar.news_fetcher import fetch_and_save_news
         stats = fetch_and_save_news(max_per_feed=30)
@@ -1003,133 +1033,6 @@ def watchlist_delete_trade(request, trade_id):
         return Response({"message": "ลบสำเร็จ"})
     except WatchlistTrade.DoesNotExist:
         return Response({"error": "ไม่พบรายการ"}, status=404)
-
-
-@api_view(["POST"])
-def watchlist_calc_sell(request, item_id):
-    """
-    POST /api/watchlist/item/<id>/calc-sell/
-    Body: { sell_price, sell_qty }
-    คำนวณกำไร/ขาดทุนถ้าขาย
-    """
-    if not request.user.is_authenticated:
-        from django.contrib.auth.models import User as DjangoUser
-        user = DjangoUser.objects.filter(is_superuser=True).first()
-    else:
-        user = request.user
-
-    from radar.models import WatchlistItem
-    try:
-        item = WatchlistItem.objects.get(id=item_id, watchlist__user=user)
-    except WatchlistItem.DoesNotExist:
-        return Response({"error": "ไม่พบรายการ"}, status=404)
-
-    sell_price = float(request.data.get("sell_price", 0))
-    sell_qty   = int(request.data.get("sell_qty", 0))
-    commission = float(request.data.get("commission_pct", 0.15)) / 100
-
-    pos = _calc_position(item)
-    avg_cost  = pos["avg_cost"]
-    total_qty = pos["total_qty"]
-
-    if sell_price <= 0 or sell_qty <= 0:
-        return Response({"error": "ราคาและจำนวนต้องมากกว่า 0"}, status=400)
-    if sell_qty > total_qty:
-        return Response({"error": f"จำนวนที่จะขาย ({sell_qty}) มากกว่าที่ถือ ({total_qty})"}, status=400)
-
-    gross_revenue = sell_price * sell_qty
-    commission_fee = gross_revenue * commission
-    net_revenue    = gross_revenue - commission_fee
-    cost_of_sold   = avg_cost * sell_qty
-    gross_pnl      = gross_revenue - cost_of_sold
-    net_pnl        = net_revenue - cost_of_sold
-    pnl_pct        = (gross_pnl / cost_of_sold * 100) if cost_of_sold > 0 else 0
-
-    remaining_qty      = total_qty - sell_qty
-    remaining_invested = avg_cost * remaining_qty
-
-    return Response({
-        "sell_price":       sell_price,
-        "sell_qty":         sell_qty,
-        "avg_cost":         round(avg_cost, 4),
-        "gross_revenue":    round(gross_revenue, 2),
-        "commission_fee":   round(commission_fee, 2),
-        "net_revenue":      round(net_revenue, 2),
-        "cost_of_sold":     round(cost_of_sold, 2),
-        "gross_pnl":        round(gross_pnl, 2),
-        "net_pnl":          round(net_pnl, 2),
-        "pnl_pct":          round(pnl_pct, 2),
-        "remaining_qty":    remaining_qty,
-        "remaining_invested": round(remaining_invested, 2),
-        "label":            "กำไร" if gross_pnl >= 0 else "ขาดทุน",
-    })
-
-# ─── Fundamental Data API ──────────────────────────────────────────────────────
-
-@api_view(["GET"])
-def fundamental_data(request, symbol: str):
-    """
-    GET /api/fundamental/<symbol>/
-    คืนข้อมูล P/E, EPS, งบการเงิน จาก yfinance
-    Cache 24 ชั่วโมง
-    """
-    from radar.fundamental_engine import get_fundamental
-    from radar.models import Symbol as SymbolModel
-
-    sym_obj = SymbolModel.objects.filter(symbol=symbol.upper()).first()
-    exchange = sym_obj.exchange if sym_obj else ""
-
-    try:
-        data = get_fundamental(symbol.upper(), exchange=exchange)
-        return Response(data)
-    except Exception as e:
-        return Response({"error": str(e)}, status=500)
-
-
-@api_view(["POST"])
-def fundamental_batch(request):
-    """
-    POST /api/fundamental/batch/
-    Body: { symbols: ["PTT","AAPL"] }
-    คืนข้อมูล fundamental หลายหุ้นพร้อมกัน (max 10)
-    """
-    from radar.fundamental_engine import get_fundamental
-    from radar.models import Symbol as SymbolModel
-    from concurrent.futures import ThreadPoolExecutor
-
-    symbols = request.data.get("symbols", [])[:10]
-    if not symbols:
-        return Response({"error": "กรุณาระบุ symbols"}, status=400)
-
-    sym_map = {s.symbol: s.exchange for s in SymbolModel.objects.filter(symbol__in=symbols)}
-
-    def fetch(sym):
-        return get_fundamental(sym, exchange=sym_map.get(sym, ""))
-
-    with ThreadPoolExecutor(max_workers=5) as ex:
-        results = list(ex.map(fetch, symbols))
-
-    return Response({"results": results})
-
-
-@api_view(["GET"])
-def watchlist_portfolio_history(request):
-    """GET /api/watchlist/history/?days=90 — P/L history รายวัน"""
-    if not request.user.is_authenticated:
-        from django.contrib.auth.models import User as DjangoUser
-        user = DjangoUser.objects.filter(is_superuser=True).first()
-        if not user:
-            return Response({"error": "กรุณา login"}, status=401)
-    else:
-        user = request.user
-
-    days = int(request.query_params.get("days", 90))
-    try:
-        from radar.portfolio_history import calc_portfolio_history
-        data = calc_portfolio_history(user, days=days)
-        return Response({"count": len(data), "history": data})
-    except Exception as e:
-        return Response({"error": str(e)}, status=500)
 
 
 @api_view(["POST"])
@@ -1918,9 +1821,9 @@ def multi_layer_scan(request):
     """
     from radar.multilayer_engine import run_multilayer_scan
 
-    p           = request.query_params
-    exchange    = p.get("exchange", "")
-    setup       = p.get("setup", "")
+    p = request.query_params
+    exchange = p.get("exchange", "")
+    setup    = p.get("setup", "")
     try:
         min_layers = max(1, min(4, int(p.get("min_layers", 2))))
     except ValueError:
@@ -1936,7 +1839,8 @@ def multi_layer_scan(request):
 
     cache_key = f"multilayer:{exchange}:{min_layers}:{setup}:{days}"
     cached    = cache.get(cache_key)
-    if cached:
+    # ป้องกัน cached 0-result: คืนเฉพาะถ้า count > 0
+    if cached and cached.get("count", 0) > 0:
         return Response(cached)
 
     results = run_multilayer_scan(
@@ -1948,7 +1852,7 @@ def multi_layer_scan(request):
     )
 
     resp = {"count": len(results), "results": results}
-    cache.set(cache_key, resp, 300)   # cache 5 นาที
+    cache.set(cache_key, resp, 300)
     return Response(resp)
 
 
@@ -1990,14 +1894,168 @@ def chat_send(request):
             return Response({"error": "ไม่พบแอดมิน"}, status=503)
 
     msg = ChatMessage.objects.create(sender=request.user, receiver=receiver, body=body)
+
+    # ── Auto-cleanup: ลบข้อความเก่าเกิน 3 วันของ user นี้ ─────────────────────
+    if not is_admin:
+        from django.utils import timezone as tz
+        from datetime import timedelta
+        from django.db.models import Q
+        cutoff = tz.now() - timedelta(days=3)
+        ChatMessage.objects.filter(
+            Q(sender=request.user) | Q(receiver=request.user),
+            created_at__lt=cutoff,
+        ).delete()
+
+    # ── AI Auto-Reply (เฉพาะเมื่อ user ธรรมดาส่ง + AI เปิดอยู่) ──────────────
+    if not is_admin:
+        _try_ai_reply(request.user, receiver, body)
+
     return Response({
-        "id":         msg.id,
-        "body":       msg.body,
-        "sender_id":  msg.sender_id,
-        "sender":     msg.sender.username,
-        "is_admin_msg": is_admin,
-        "created_at": msg.created_at.isoformat(),
+        "id":             msg.id,
+        "body":           msg.body,
+        "sender_id":      msg.sender_id,
+        "sender":         msg.sender.username,
+        "is_admin_msg":   is_admin,
+        "is_ai_response": False,
+        "created_at":     msg.created_at.isoformat(),
     }, status=201)
+
+
+def _try_ai_reply(user, admin_user, user_message: str):
+    """
+    เรียก Gemini 2.5 Flash (Google AI Studio) พร้อม Function Calling
+    Gemini สามารถเรียก tools เพื่อดึงข้อมูลจริงจากระบบได้เอง
+    """
+    import logging as _log
+    _logger = _log.getLogger(__name__)
+
+    from django.conf import settings
+    from radar.models import SiteSetting
+
+    setting = SiteSetting.get()
+    if not setting.ai_chat_enabled:
+        return
+
+    api_key = getattr(settings, "GOOGLE_AI_API_KEY", "")
+    if not api_key:
+        return
+
+    # Rate limit
+    daily_limit = getattr(settings, "AI_CHAT_DAILY_LIMIT", 30)
+    if daily_limit > 0:
+        import datetime
+        today = datetime.date.today()
+        ai_today = ChatMessage.objects.filter(
+            receiver=user, is_ai_response=True, created_at__date=today,
+        ).count()
+        if ai_today >= daily_limit:
+            return
+
+    # ดึงประวัติสนทนา (10 ข้อความล่าสุด)
+    from django.db.models import Q
+    history_qs = ChatMessage.objects.filter(
+        Q(sender=user, receiver=admin_user) |
+        Q(sender=admin_user, receiver=user)
+    ).order_by("-created_at")[:10]
+
+    history = []
+    for h in reversed(list(history_qs)):
+        role = "user" if h.sender_id == user.id else "model"
+        history.append({"role": role, "parts": [{"text": h.body}]})
+
+    if not history or history[-1]["parts"][0]["text"] != user_message:
+        history.append({"role": "user", "parts": [{"text": user_message}]})
+
+    system_prompt = (
+        "คุณคือ AI assistant ของ radarhoon.com ระบบสแกนและวิเคราะห์หุ้น\n"
+        "คุณมี tools ให้ใช้เพื่อดึงข้อมูลจริงจากระบบ — ใช้ tools เสมอเมื่อ user ถามเรื่องหุ้น\n\n"
+        "กฎการตอบ (สำคัญมาก):\n"
+        "- ตอบเป็นภาษาไทย\n"
+        "- แต่ละข้อมูลหรือหัวข้อต้องอยู่คนละบรรทัด ห้ามยัดข้อมูลในบรรทัดเดียว\n"
+        "- ใช้ **ข้อความ** สำหรับหัวข้อสำคัญ\n"
+        "- เว้นบรรทัดว่างระหว่างกลุ่มข้อมูล\n"
+        "- กระชับ ตรงประเด็น ไม่ต้องอธิบายยาว\n\n"
+        "ตัวอย่างรูปแบบที่ถูก:\n"
+        "**PTT — คะแนนดี**\n"
+        "ราคาปัจจุบัน: 34.31 บาท\n"
+        "RSI: 57.2 (ปานกลาง)\n"
+        "MACD: 0.09 (บวก)\n"
+        "EMA20: 34.31 | EMA50: 33.72\n\n"
+        "**สรุป:** ผ่าน 3 ใน 4 Layer\n\n"
+        "ข้อห้าม:\n"
+        "- ห้ามแนะนำให้ซื้อหรือขายหุ้นอย่างชัดเจน\n"
+        "- ไม่ใช่ที่ปรึกษาการเงิน ทุกการตัดสินใจเป็นความรับผิดชอบของผู้ใช้"
+    )
+
+    try:
+        from google import genai as google_genai
+        from google.genai import types as genai_types
+        from radar.ai_tools import get_tool_definitions, handle_tool_call
+
+        client = google_genai.Client(api_key=api_key)
+        tool_def = get_tool_definitions()
+        config = genai_types.GenerateContentConfig(
+            system_instruction=system_prompt,
+            tools=[tool_def],
+            temperature=0.7,
+        )
+
+        # ── Function Calling Loop ────────────────────────────────────────────
+        contents = list(history)
+        MAX_ROUNDS = 5
+
+        for _ in range(MAX_ROUNDS):
+            response = client.models.generate_content(
+                model="gemini-2.5-flash",
+                contents=contents,
+                config=config,
+            )
+
+            # ตรวจว่า Gemini ขอ tool call ไหม
+            candidate = response.candidates[0] if response.candidates else None
+            if not candidate:
+                break
+
+            function_calls = [
+                part.function_call
+                for part in (candidate.content.parts or [])
+                if getattr(part, "function_call", None)
+            ]
+
+            if not function_calls:
+                break  # Gemini ตอบ text แล้ว — จบ loop
+
+            # Execute tools แล้วส่งผลกลับ Gemini
+            tool_response_parts = []
+            for fc in function_calls:
+                _logger.info("AI tool call: %s(%s)", fc.name, dict(fc.args))
+                result = handle_tool_call(fc.name, dict(fc.args), user)
+                tool_response_parts.append(
+                    genai_types.Part.from_function_response(
+                        name=fc.name,
+                        response={"result": result},
+                    )
+                )
+
+            # เพิ่ม Gemini's tool call + tool results เข้า contents
+            contents = list(contents) + [
+                candidate.content,
+                genai_types.Content(role="user", parts=tool_response_parts),
+            ]
+        # ────────────────────────────────────────────────────────────────────
+
+        ai_text = (response.text or "").strip()
+        if ai_text:
+            ChatMessage.objects.create(
+                sender=admin_user,
+                receiver=user,
+                body=ai_text,
+                is_ai_response=True,
+            )
+
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).error("AI reply error: %s", e)
 
 
 @api_view(["GET"])
@@ -2038,14 +2096,15 @@ def chat_messages(request):
 
     data = [
         {
-            "id":           m.id,
-            "body":         m.body,
-            "sender_id":    m.sender_id,
-            "sender":       m.sender.username,
-            "is_mine":      m.sender_id == request.user.id,
-            "is_admin_msg": m.sender.is_staff or m.sender.is_superuser,
-            "is_read":      m.is_read,
-            "created_at":   m.created_at.isoformat(),
+            "id":             m.id,
+            "body":           m.body,
+            "sender_id":      m.sender_id,
+            "sender":         m.sender.username,
+            "is_mine":        m.sender_id == request.user.id,
+            "is_admin_msg":   m.sender.is_staff or m.sender.is_superuser,
+            "is_ai_response": getattr(m, "is_ai_response", False),
+            "is_read":        m.is_read,
+            "created_at":     m.created_at.isoformat(),
         }
         for m in msgs
     ]
