@@ -62,10 +62,31 @@ export default function Chat({ onRead }: { onRead?: () => void }) {
     })
   }
 
+  function renderBody(body: string, isAI: boolean) {
+    if (!isAI) return <span>{body}</span>
+    // แปลง **bold** → <strong> แล้ว render แต่ละบรรทัดแยกกัน
+    return (
+      <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+        {body.split("\n").map((line, i) => {
+          const parts = line.split(/(\*\*[^*]+\*\*)/g)
+          return (
+            <div key={i} style={{ minHeight: line.trim() === "" ? 6 : undefined }}>
+              {parts.map((p, j) =>
+                p.startsWith("**") && p.endsWith("**")
+                  ? <strong key={j}>{p.slice(2, -2)}</strong>
+                  : <span key={j}>{p}</span>
+              )}
+            </div>
+          )
+        })}
+      </div>
+    )
+  }
+
   return (
     <div style={{
-      maxWidth: 700, margin: "0 auto", padding: "20px 16px",
-      display: "flex", flexDirection: "column", height: "calc(100vh - 140px)",
+      width: "100%", padding: "16px 20px",
+      display: "flex", flexDirection: "column", height: "calc(100vh - 120px)",
     }}>
       {/* Header */}
       <div style={{
@@ -145,29 +166,36 @@ export default function Chat({ onRead }: { onRead?: () => void }) {
               )}
 
               {/* Bubble */}
-              <div style={{ maxWidth: "72%", display: "flex", flexDirection: "column",
-                alignItems: msg.is_mine ? "flex-end" : "flex-start", gap: 3 }}>
+              <div style={{
+                maxWidth: msg.is_ai_response ? "88%" : "72%",
+                display: "flex", flexDirection: "column",
+                alignItems: msg.is_mine ? "flex-end" : "flex-start", gap: 4,
+              }}>
                 {!msg.is_mine && (
-                  <span style={{ fontSize: 11, color: "var(--text-muted)", paddingLeft: 4 }}>
+                  <span style={{ fontSize: 12, color: "var(--text-muted)", paddingLeft: 4, fontWeight: 600 }}>
                     {msg.is_ai_response ? "Radar AI" : "ทีมงาน"}
                   </span>
                 )}
                 <div style={{
-                  padding: "10px 14px",
+                  padding: "12px 16px",
                   borderRadius: msg.is_mine
                     ? "16px 16px 4px 16px"
                     : "16px 16px 16px 4px",
                   background: msg.is_mine
                     ? "linear-gradient(135deg,#1565c0,#0288d1)"
-                    : "var(--bg-card)",
-                  border: msg.is_mine ? "none" : "1px solid var(--border)",
+                    : msg.is_ai_response
+                      ? "linear-gradient(135deg,rgba(21,101,192,0.08),rgba(2,136,209,0.06))"
+                      : "var(--bg-card)",
+                  border: msg.is_mine ? "none" : msg.is_ai_response
+                    ? "1px solid rgba(21,101,192,0.3)"
+                    : "1px solid var(--border)",
                   color: msg.is_mine ? "#fff" : "var(--text-main)",
-                  fontSize: 14,
-                  lineHeight: 1.5,
+                  fontSize: 15,
+                  lineHeight: 1.7,
                   wordBreak: "break-word",
                   boxShadow: "0 1px 4px rgba(0,0,0,.2)",
                 }}>
-                  {msg.body}
+                  {renderBody(msg.body, !!msg.is_ai_response)}
                 </div>
                 <span style={{ fontSize: 10, color: "var(--text-muted)", paddingLeft: 2, paddingRight: 2 }}>
                   {formatTime(msg.created_at)}
