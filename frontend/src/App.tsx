@@ -32,6 +32,7 @@ const USER_NAV: { id: string; label: string; icon: string }[] = [
   { id: "dashboard",    label: "ราดาร์",            icon: "📡" },
   { id: "engine_scan",  label: "ตัวอย่างผลสแกนที่เข้าเกณฑ์",  icon: "🔥" },
   { id: "watchlist",    label: "Watchlist",           icon: "⭐" },
+  { id: "chat",         label: "คุยกับเอไอ",          icon: "💬" },
   { id: "news",         label: "ข่าว & Sentiment",   icon: "📰" },
   { id: "analyze",      label: "วิเคราะห์หุ้น",     icon: "🔬" },
   { id: "fundamental",  label: "Fundamental",         icon: "📊" },
@@ -45,7 +46,6 @@ const USER_NAV: { id: string; label: string; icon: string }[] = [
   { id: "guide",        label: "คำแนะนำ & ถาม-ตอบ",  icon: "💡" },
   { id: "profile",      label: "บัญชี & สมาชิก",     icon: "⚙️" },
   { id: "contact",      label: "ติดต่อเรา",          icon: "📞" },
-  { id: "chat",         label: "ข้อความ",             icon: "💬" },
 ]
 
 function AppInner() {

@@ -100,10 +100,10 @@ export default function Chat({ onRead }: { onRead?: () => void }) {
         <img src="/ai-avatar.png" alt="Radar AI" style={{ width: 38, height: 38, borderRadius: "50%", objectFit: "cover", border: "2px solid #1565c0" }} />
         <div>
           <div style={{ fontWeight: 700, fontSize: 15, color: "var(--text-main)" }}>
-            ติดต่อทีมงาน
+            คุยกับเอไอ
           </div>
           <div style={{ fontSize: 11, color: "var(--text-muted)" }}>
-            แอดมินจะตอบกลับโดยเร็วที่สุด
+            AI พร้อมช่วยเหลือตลอด 24 ชั่วโมง
           </div>
         </div>
       </div>
