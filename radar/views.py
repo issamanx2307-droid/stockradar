@@ -1956,36 +1956,25 @@ def _try_ai_reply(user, admin_user, user_message: str):
         "- ไม่ใช่ที่ปรึกษาการเงิน ทุกการตัดสินใจลงทุนเป็นความรับผิดชอบของผู้ใช้"
     )
 
+    import logging as _logging
+    _log = _logging.getLogger(__name__)
     try:
-        from google import genai as google_genai
-        from google.genai import types as genai_types
-        client = google_genai.Client(
-            api_key=api_key,
-            http_options={"api_version": "v1"},
-        )
-        # v1 API ไม่รองรับ system_instruction field
-        # inject system prompt เป็นคู่ user/model แรกใน history แทน
-        system_turn = [
-            {"role": "user", "parts": [{"text": f"[คำแนะนำระบบ] {system_prompt}"}]},
-            {"role": "model", "parts": [{"text": "เข้าใจแล้วครับ ฉันพร้อมช่วยเหลือเกี่ยวกับ StockRadar"}]},
-        ]
-        full_contents = system_turn + history
-        response = client.models.generate_content(
-            model="gemini-1.5-flash",
-            contents=full_contents,
-            config=genai_types.GenerateContentConfig(temperature=0.7),
-        )
-        ai_text = response.text.strip() if response.text else ""
-        if ai_text:
-            ChatMessage.objects.create(
-                sender=admin_user,
-                receiver=user,
-                body=ai_text,
-                is_ai_response=True,
-            )
+        import requests as _requests
+        # ดู models ที่ใช้ได้กับ API key นี้
+        models_url = f"https://generativelanguage.googleapis.com/v1beta/models?key={api_key}&pageSize=50"
+        models_resp = _requests.get(models_url, timeout=10)
+        if models_resp.ok:
+            all_models = models_resp.json().get("models", [])
+            gemini_models = [
+                m["name"] for m in all_models
+                if "gemini" in m.get("name", "").lower()
+                and "generateContent" in m.get("supportedGenerationMethods", [])
+            ]
+            _log.info("Available Gemini models: %s", gemini_models)
+        else:
+            _log.error("Cannot list models: %s", models_resp.text[:300])
     except Exception as e:
-        import logging
-        logging.getLogger(__name__).error("AI reply error: %s", e)
+        _log.error("Model list error: %s", e)
 
 
 @api_view(["GET"])
