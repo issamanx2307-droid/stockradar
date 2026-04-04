@@ -64,7 +64,6 @@ export default function Chat({ onRead }: { onRead?: () => void }) {
 
   function renderBody(body: string, isAI: boolean) {
     if (!isAI) return <span>{body}</span>
-    // แปลง **bold** → <strong> แล้ว render แต่ละบรรทัดแยกกัน
     return (
       <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
         {body.split("\n").map((line, i) => {
@@ -86,7 +85,7 @@ export default function Chat({ onRead }: { onRead?: () => void }) {
   return (
     <div style={{
       width: "100%", padding: "16px 20px",
-      display: "flex", flexDirection: "column", height: "calc(100vh - 120px)",
+      display: "flex", flexDirection: "column", height: "calc(100vh - 56px)",
     }}>
       {/* Header */}
       <div style={{
@@ -142,27 +141,14 @@ export default function Chat({ onRead }: { onRead?: () => void }) {
               alignItems: "flex-end",
               gap: 8,
             }}>
-              {/* Avatar */}
-              {!msg.is_mine && (
-                msg.is_ai_response ? (
-                  <img
-                    src="/ai-avatar.png"
-                    alt="AI"
-                    style={{
-                      width: 36, height: 36, borderRadius: "50%",
-                      objectFit: "cover", flexShrink: 0,
-                      border: "2px solid #1565c0",
-                      background: "#0d1b2a",
-                    }}
-                  />
-                ) : (
-                  <div style={{
-                    width: 32, height: 32, borderRadius: "50%",
-                    background: "linear-gradient(135deg,#1565c0,#0288d1)",
-                    display: "flex", alignItems: "center", justifyContent: "center",
-                    fontSize: 14, flexShrink: 0,
-                  }}>🛠️</div>
-                )
+              {/* Avatar — show only for admin/team messages, not AI */}
+              {!msg.is_mine && !msg.is_ai_response && (
+                <div style={{
+                  width: 32, height: 32, borderRadius: "50%",
+                  background: "linear-gradient(135deg,#1565c0,#0288d1)",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  fontSize: 14, flexShrink: 0,
+                }}>🛠️</div>
               )}
 
               {/* Bubble */}
@@ -212,15 +198,25 @@ export default function Chat({ onRead }: { onRead?: () => void }) {
         <div ref={bottomRef} />
       </div>
 
-      {/* Input */}
+      {/* Input — sticks to bottom */}
       <div style={{
-        display: "flex", gap: 8,
-        padding: "12px",
+        display: "flex", alignItems: "center", gap: 8,
+        padding: "10px 12px",
         background: "var(--bg-card)",
         border: "1px solid var(--border)",
         borderRadius: "0 0 12px 12px",
         borderTop: "none",
       }}>
+        {/* Robot icon inside input bar */}
+        <img
+          src="/ai-avatar.png"
+          alt="AI"
+          style={{
+            width: 32, height: 32, borderRadius: "50%",
+            objectFit: "cover", flexShrink: 0,
+            border: "2px solid #1565c0",
+          }}
+        />
         <textarea
           value={input}
           onChange={e => setInput(e.target.value)}
@@ -246,6 +242,7 @@ export default function Chat({ onRead }: { onRead?: () => void }) {
           disabled={!input.trim() || sending}
           style={{
             padding: "0 20px",
+            alignSelf: "stretch",
             background: input.trim() && !sending
               ? "linear-gradient(135deg,#1565c0,#0288d1)"
               : "var(--bg-elevated)",
