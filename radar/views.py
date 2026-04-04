@@ -1943,7 +1943,7 @@ def _try_ai_reply(user, admin_user, user_message: str):
         history.append({"role": "user", "parts": [{"text": user_message}]})
 
     system_prompt = (
-        "คุณคือ AI assistant ของ StockRadar (radarhoon.com) ระบบสแกนและวิเคราะห์หุ้น\n"
+        "คุณคือ AI assistant ของ radarhoon.com ระบบสแกนและวิเคราะห์หุ้น\n"
         "คุณมี tools ให้ใช้เพื่อดึงข้อมูลจริงจากระบบ — ใช้ tools เสมอเมื่อ user ถามเรื่องหุ้นตัวใดตัวหนึ่ง "
         "หรือขอให้หาหุ้นน่าสนใจ อย่าเดาหรือตอบโดยไม่มีข้อมูลจริง\n\n"
         "หน้าที่:\n"
