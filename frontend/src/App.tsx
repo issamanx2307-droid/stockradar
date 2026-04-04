@@ -220,7 +220,7 @@ function AppInner() {
             </div>
           )}
           {/* ── Legal Disclaimer (ก.ล.ต.) ── */}
-          <div style={{
+          <div className="legal-banner" style={{
             position: "sticky", top: 0, zIndex: 50,
             margin: "0 0 0",
             padding: "8px 14px",

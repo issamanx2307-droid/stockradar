@@ -905,6 +905,19 @@ body {
     z-index: 200;
   }
 
+  /* Warning banner — stick ใต้ navbar บน mobile */
+  .legal-banner {
+    top: 56px !important;
+    z-index: 150 !important;
+  }
+
+  /* Chat header — stick ใต้ warning banner */
+  .chat-header {
+    position: sticky;
+    top: calc(56px + 37px); /* navbar + banner */
+    z-index: 100;
+  }
+
   .main-content {
     padding-top: 56px;
   }

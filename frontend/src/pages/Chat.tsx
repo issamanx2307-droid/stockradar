@@ -89,7 +89,7 @@ export default function Chat({ onRead }: { onRead?: () => void }) {
       overflow: "hidden", boxSizing: "border-box",
     }}>
       {/* Header */}
-      <div style={{
+      <div className="chat-header" style={{
         display: "flex", alignItems: "center", gap: 10,
         padding: "12px 16px",
         background: "var(--bg-card)",
