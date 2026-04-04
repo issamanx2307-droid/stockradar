@@ -1959,7 +1959,10 @@ def _try_ai_reply(user, admin_user, user_message: str):
     try:
         from google import genai as google_genai
         from google.genai import types as genai_types
-        client = google_genai.Client(api_key=api_key)
+        client = google_genai.Client(
+            api_key=api_key,
+            http_options={"api_version": "v1"},
+        )
         response = client.models.generate_content(
             model="gemini-1.5-flash",
             contents=history,
