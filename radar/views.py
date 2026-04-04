@@ -1882,6 +1882,17 @@ def chat_send(request):
 
     msg = ChatMessage.objects.create(sender=request.user, receiver=receiver, body=body)
 
+    # ── Auto-cleanup: ลบข้อความเก่าเกิน 3 วันของ user นี้ ─────────────────────
+    if not is_admin:
+        from django.utils import timezone as tz
+        from datetime import timedelta
+        from django.db.models import Q
+        cutoff = tz.now() - timedelta(days=3)
+        ChatMessage.objects.filter(
+            Q(sender=request.user) | Q(receiver=request.user),
+            created_at__lt=cutoff,
+        ).delete()
+
     # ── AI Auto-Reply (เฉพาะเมื่อ user ธรรมดาส่ง + AI เปิดอยู่) ──────────────
     if not is_admin:
         _try_ai_reply(request.user, receiver, body)

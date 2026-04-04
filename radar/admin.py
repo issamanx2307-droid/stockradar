@@ -255,89 +255,102 @@ class ProfileAdmin(admin.ModelAdmin):
 
 @admin.register(ChatMessage)
 class ChatMessageAdmin(admin.ModelAdmin):
-    list_display  = ("from_badge", "msg_preview", "to_user", "unread_badge", "created_at", "reply_btn")
-    list_filter   = ("is_read", "created_at")
-    search_fields = ("sender__username", "sender__email", "body")
-    ordering      = ("-created_at",)
-    date_hierarchy = "created_at"
+    """
+    หน้า list → แสดงเป็น user inbox (1 แถว / 1 user)
+    หน้า detail / filter by sender → แสดงทุกข้อความของ user นั้น
+    """
+    list_display   = ("user_inbox", "last_msg_preview", "unread_count_badge", "last_active", "action_btns")
+    list_filter    = ("is_read",)
+    search_fields  = ("sender__username", "sender__email", "body")
+    ordering       = ("-created_at",)
     readonly_fields = ("sender", "receiver", "body", "is_read", "created_at")
 
     fieldsets = (
-        ("ข้อความที่รับ", {
-            "fields": ("sender", "receiver", "body", "is_read", "created_at"),
-        }),
+        ("ข้อความ", {"fields": ("sender", "receiver", "body", "is_read", "created_at")}),
     )
-
     actions = ["mark_read"]
 
     def get_queryset(self, request):
-        # แสดงเฉพาะข้อความจาก user ธรรมดา (ไม่ใช่ admin พูดกับ admin)
+        from django.db.models import Max
         qs = super().get_queryset(request)
-        return qs.filter(sender__is_staff=False, sender__is_superuser=False)
-
-    def from_badge(self, obj):
-        color = "#ef4444" if not obj.is_read else "#6b7280"
-        return format_html(
-            '<span style="color:{}; font-weight:bold;">👤 {}</span>',
-            color, obj.sender.username
+        # กรองเฉพาะข้อความของ user ธรรมดา
+        qs = qs.filter(sender__is_staff=False, sender__is_superuser=False)
+        # ถ้ามี filter sender (admin กดดู inbox ของ user คนใดคนหนึ่ง) → แสดงทั้งหมด
+        if "sender__id__exact" in request.GET or "sender__username" in request.GET:
+            return qs
+        # ปกติ → แสดงเฉพาะข้อความล่าสุดต่อ user (inbox view)
+        latest_ids = (
+            qs.values("sender")
+            .annotate(latest_id=Max("id"))
+            .values_list("latest_id", flat=True)
         )
-    from_badge.short_description = "จาก"
-    from_badge.admin_order_field = "sender__username"
+        return qs.filter(id__in=latest_ids)
 
-    def to_user(self, obj):
-        return obj.receiver.username
-    to_user.short_description = "ถึง"
+    def user_inbox(self, obj):
+        url = f"/mantapa/radar/chatmessage/?sender__id__exact={obj.sender.id}"
+        return format_html(
+            '👤 <a href="{}" style="font-weight:bold;color:#1565c0;">{}</a><br>'
+            '<small style="color:#6b7280;">{}</small>',
+            url, obj.sender.username, obj.sender.email,
+        )
+    user_inbox.short_description = "ผู้ใช้"
+    user_inbox.allow_tags = True
 
-    def msg_preview(self, obj):
+    def last_msg_preview(self, obj):
         text = (obj.body or "").strip()
         return text[:80] + ("…" if len(text) > 80 else "")
-    msg_preview.short_description = "ข้อความ"
+    last_msg_preview.short_description = "ข้อความล่าสุด"
 
-    def unread_badge(self, obj):
-        if not obj.is_read:
-            return format_html('<span style="background:#ef4444;color:#fff;padding:1px 8px;border-radius:10px;font-size:11px;">ใหม่</span>')
+    def unread_count_badge(self, obj):
+        count = ChatMessage.objects.filter(
+            sender=obj.sender, is_read=False,
+            sender__is_staff=False, sender__is_superuser=False,
+        ).count()
+        if count:
+            return format_html(
+                '<span style="background:#ef4444;color:#fff;padding:2px 10px;'
+                'border-radius:10px;font-weight:bold;">{} ใหม่</span>', count
+            )
         return format_html('<span style="color:#6b7280;font-size:11px;">อ่านแล้ว</span>')
-    unread_badge.short_description = "สถานะ"
+    unread_count_badge.short_description = "สถานะ"
 
-    def reply_btn(self, obj):
-        url = (
-            f"/mantapa/radar/chatmessage/add/"
-            f"?receiver={obj.sender.id}"
-            f"&sender={obj.receiver.id}"
-        )
+    def last_active(self, obj):
+        return obj.created_at
+    last_active.short_description = "ล่าสุด"
+    last_active.admin_order_field = "created_at"
+
+    def action_btns(self, obj):
+        view_url  = f"/mantapa/radar/chatmessage/?sender__id__exact={obj.sender.id}"
+        reply_url = f"/mantapa/radar/chatmessage/add/?receiver={obj.sender.id}&sender={obj.receiver.id}"
         return format_html(
-            '<a href="{}" style="background:#1565c0;color:#fff;padding:2px 10px;'
-            'border-radius:4px;font-size:12px;text-decoration:none;">↩ ตอบกลับ</a>',
-            url
+            '<a href="{}" style="background:#374151;color:#fff;padding:2px 8px;'
+            'border-radius:4px;font-size:11px;text-decoration:none;margin-right:4px;">📋 ดูทั้งหมด</a>'
+            '<a href="{}" style="background:#1565c0;color:#fff;padding:2px 8px;'
+            'border-radius:4px;font-size:11px;text-decoration:none;">↩ ตอบ</a>',
+            view_url, reply_url,
         )
-    reply_btn.short_description = ""
+    action_btns.short_description = ""
 
     def mark_read(self, request, queryset):
-        queryset.update(is_read=True)
-        self.message_user(request, f"Mark read {queryset.count()} ข้อความ")
-    mark_read.short_description = "✅ Mark เป็นอ่านแล้ว"
-
-    def get_form(self, request, obj=None, **kwargs):
-        # สำหรับหน้า Add — ใช้ตอบกลับ user
-        form = super().get_form(request, obj, **kwargs)
-        return form
+        from django.db.models import Q as _Q
+        # mark read ทุกข้อความของ user เหล่านั้น
+        sender_ids = queryset.values_list("sender_id", flat=True)
+        updated = ChatMessage.objects.filter(sender_id__in=sender_ids).update(is_read=True)
+        self.message_user(request, f"Mark read {updated} ข้อความ")
+    mark_read.short_description = "✅ Mark อ่านแล้วทั้งหมด"
 
     def save_model(self, request, obj, form, change):
         if not obj.pk:
-            # ข้อความใหม่จาก admin → set sender เป็น admin ที่ login อยู่
             obj.sender = request.user
         super().save_model(request, obj, form, change)
 
-    # หน้า Add — ไม่ readonly
     def get_readonly_fields(self, request, obj=None):
         if obj:
             return ("sender", "receiver", "body", "is_read", "created_at")
         return ("created_at",)
 
     add_fieldsets = (
-        ("ตอบกลับ User", {
-            "fields": ("receiver", "body"),
-        }),
+        ("ตอบกลับ User", {"fields": ("receiver", "body")}),
     )
 
     def get_fieldsets(self, request, obj=None):
