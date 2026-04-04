@@ -905,21 +905,47 @@ body {
     z-index: 200;
   }
 
-  /* Warning banner — stick ใต้ navbar บน mobile */
+  /* main-content เป็น scroll container หลักบน mobile */
+  .main-content {
+    margin-top: 56px;
+    height: calc(100vh - 56px);
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding-top: 0 !important;
+    padding-bottom: 0 !important;
+  }
+
+  /* Warning banner sticky ติดบน main-content */
   .legal-banner {
-    top: 56px !important;
+    position: sticky !important;
+    top: 0 !important;
     z-index: 150 !important;
   }
 
-  /* Chat header — stick ใต้ warning banner */
+  /* Chat header — ไม่ sticky บน mobile เพื่อไม่ทับข้อความ */
   .chat-header {
-    position: sticky;
-    top: calc(56px + 37px); /* navbar + banner */
-    z-index: 100;
+    position: static !important;
   }
 
-  .main-content {
-    padding-top: 56px;
+  /* Chat outer — ให้ไหลตามธรรมชาติ */
+  .chat-outer {
+    height: auto !important;
+    overflow: visible !important;
+    padding: 0 8px 8px !important;
+  }
+
+  /* Messages — ไหลตามธรรมชาติ ไม่ scroll ซ้อน */
+  .chat-messages {
+    height: auto !important;
+    overflow-y: visible !important;
+    min-height: 100px;
+  }
+
+  /* Input bar — ติดล่าง */
+  .chat-input-bar {
+    position: sticky !important;
+    bottom: 0 !important;
+    z-index: 100;
   }
 
   .sidebar-logo { display: none; }

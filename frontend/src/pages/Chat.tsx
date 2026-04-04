@@ -83,7 +83,7 @@ export default function Chat({ onRead }: { onRead?: () => void }) {
   }
 
   return (
-    <div style={{
+    <div className="chat-outer" style={{
       width: "100%", padding: "16px 20px",
       display: "flex", flexDirection: "column", height: "calc(100vh - 56px)",
       overflow: "hidden", boxSizing: "border-box",
@@ -109,7 +109,7 @@ export default function Chat({ onRead }: { onRead?: () => void }) {
       </div>
 
       {/* Messages */}
-      <div style={{
+      <div className="chat-messages" style={{
         flex: 1,
         overflowY: "auto",
         padding: "16px",
@@ -200,7 +200,7 @@ export default function Chat({ onRead }: { onRead?: () => void }) {
       </div>
 
       {/* Input — sticks to bottom */}
-      <div style={{
+      <div className="chat-input-bar" style={{
         display: "flex", alignItems: "center", gap: 8,
         padding: "10px 12px",
         background: "var(--bg-card)",
