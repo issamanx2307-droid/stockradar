@@ -221,12 +221,13 @@ function AppInner() {
           )}
           {/* ── Legal Disclaimer (ก.ล.ต.) ── */}
           <div style={{
-            margin: "12px 16px 0",
+            position: "sticky", top: 0, zIndex: 50,
+            margin: "0 0 0",
             padding: "8px 14px",
             background: "var(--bg-elevated)",
             border: "1px solid var(--border)",
             borderLeft: "3px solid var(--yellow)",
-            borderRadius: 6,
+            borderRadius: 0,
             fontSize: 11,
             color: "var(--text-muted)",
             lineHeight: 1.7,
