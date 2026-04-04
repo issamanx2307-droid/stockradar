@@ -8,7 +8,17 @@ export default function Chat({ onRead }: { onRead?: () => void }) {
   const [sending, setSending]     = useState(false)
   const [loading, setLoading]     = useState(true)
   const bottomRef                 = useRef<HTMLDivElement>(null)
+  const messagesRef               = useRef<HTMLDivElement>(null)
   const pollRef                   = useRef<ReturnType<typeof setInterval> | null>(null)
+  const isAtBottomRef             = useRef(true)
+  const prevCountRef              = useRef(0)
+
+  function checkAtBottom() {
+    const el = messagesRef.current
+    if (!el) return
+    // ถือว่า "อยู่ล่างสุด" ถ้าเหลือระยะ scroll น้อยกว่า 80px
+    isAtBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80
+  }
 
   async function loadMessages() {
     try {
@@ -29,13 +39,23 @@ export default function Chat({ onRead }: { onRead?: () => void }) {
   }, [])
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" })
+    const newCount = messages.length
+    const hadMessages = prevCountRef.current > 0
+    prevCountRef.current = newCount
+
+    // scroll ลงล่างสุดเมื่อ:
+    // 1. โหลดครั้งแรก (hadMessages=false)
+    // 2. user อยู่ที่ล่างสุดอยู่แล้ว (poll ดึงข้อความใหม่มา ก็ scroll ตาม)
+    if (!hadMessages || isAtBottomRef.current) {
+      bottomRef.current?.scrollIntoView({ behavior: "smooth" })
+    }
   }, [messages])
 
   async function handleSend() {
     const text = input.trim()
     if (!text || sending) return
     setSending(true)
+    isAtBottomRef.current = true  // ส่งข้อความแล้ว scroll ลงล่างเสมอ
     try {
       await api.chatSend(text)
       setInput("")
@@ -109,7 +129,7 @@ export default function Chat({ onRead }: { onRead?: () => void }) {
       </div>
 
       {/* Messages */}
-      <div className="chat-messages" style={{
+      <div ref={messagesRef} onScroll={checkAtBottom} className="chat-messages" style={{
         flex: 1,
         overflowY: "auto",
         padding: "16px",
