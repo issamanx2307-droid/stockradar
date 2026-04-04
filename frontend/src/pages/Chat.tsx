@@ -76,7 +76,7 @@ export default function Chat({ onRead }: { onRead?: () => void }) {
         borderRadius: "12px 12px 0 0",
         borderBottom: "none",
       }}>
-        <span style={{ fontSize: 22 }}>💬</span>
+        <img src="/ai-avatar.png" alt="Radar AI" style={{ width: 38, height: 38, borderRadius: "50%", objectFit: "cover", border: "2px solid #1565c0" }} />
         <div>
           <div style={{ fontWeight: 700, fontSize: 15, color: "var(--text-main)" }}>
             ติดต่อทีมงาน
@@ -123,12 +123,25 @@ export default function Chat({ onRead }: { onRead?: () => void }) {
             }}>
               {/* Avatar */}
               {!msg.is_mine && (
-                <div style={{
-                  width: 32, height: 32, borderRadius: "50%",
-                  background: "linear-gradient(135deg,#1565c0,#0288d1)",
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                  fontSize: 14, flexShrink: 0,
-                }}>🛠️</div>
+                msg.is_ai_response ? (
+                  <img
+                    src="/ai-avatar.png"
+                    alt="AI"
+                    style={{
+                      width: 36, height: 36, borderRadius: "50%",
+                      objectFit: "cover", flexShrink: 0,
+                      border: "2px solid #1565c0",
+                      background: "#0d1b2a",
+                    }}
+                  />
+                ) : (
+                  <div style={{
+                    width: 32, height: 32, borderRadius: "50%",
+                    background: "linear-gradient(135deg,#1565c0,#0288d1)",
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    fontSize: 14, flexShrink: 0,
+                  }}>🛠️</div>
+                )
               )}
 
               {/* Bubble */}
@@ -136,7 +149,7 @@ export default function Chat({ onRead }: { onRead?: () => void }) {
                 alignItems: msg.is_mine ? "flex-end" : "flex-start", gap: 3 }}>
                 {!msg.is_mine && (
                   <span style={{ fontSize: 11, color: "var(--text-muted)", paddingLeft: 4 }}>
-                    ทีมงาน
+                    {msg.is_ai_response ? "Radar AI" : "ทีมงาน"}
                   </span>
                 )}
                 <div style={{
