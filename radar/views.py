@@ -1899,8 +1899,12 @@ def chat_send(request):
 
 def _try_ai_reply(user, admin_user, user_message: str):
     """
-    เรียก Gemma 3n E4B (Google AI Studio) และบันทึก AI reply เป็น ChatMessage
+    เรียก Gemini 2.5 Flash (Google AI Studio) พร้อม Function Calling
+    Gemini สามารถเรียก tools เพื่อดึงข้อมูลจริงจากระบบได้เอง
     """
+    import logging as _log
+    _logger = _log.getLogger(__name__)
+
     from django.conf import settings
     from radar.models import SiteSetting
 
@@ -1912,63 +1916,104 @@ def _try_ai_reply(user, admin_user, user_message: str):
     if not api_key:
         return
 
-    # Rate limit: ตรวจสอบจำนวน AI reply ที่ user ได้รับวันนี้
+    # Rate limit
     daily_limit = getattr(settings, "AI_CHAT_DAILY_LIMIT", 30)
     if daily_limit > 0:
         import datetime
         today = datetime.date.today()
         ai_today = ChatMessage.objects.filter(
-            receiver=user,
-            is_ai_response=True,
-            created_at__date=today,
+            receiver=user, is_ai_response=True, created_at__date=today,
         ).count()
         if ai_today >= daily_limit:
             return
 
-    # ดึงประวัติสนทนาล่าสุด (10 ข้อความ) เป็น context
+    # ดึงประวัติสนทนา (10 ข้อความล่าสุด)
     from django.db.models import Q
     history_qs = ChatMessage.objects.filter(
         Q(sender=user, receiver=admin_user) |
         Q(sender=admin_user, receiver=user)
     ).order_by("-created_at")[:10]
 
-    # แปลงเป็น format ที่ Google Generative AI ต้องการ
     history = []
     for h in reversed(list(history_qs)):
         role = "user" if h.sender_id == user.id else "model"
         history.append({"role": role, "parts": [{"text": h.body}]})
 
-    # เพิ่มข้อความล่าสุดถ้ายังไม่อยู่ใน history
     if not history or history[-1]["parts"][0]["text"] != user_message:
         history.append({"role": "user", "parts": [{"text": user_message}]})
 
     system_prompt = (
-        "คุณคือ AI assistant ของ StockRadar (radarhoon.com) "
-        "ระบบสแกนและวิเคราะห์หุ้นไทย\n"
-        "หน้าที่ของคุณ:\n"
-        "- ช่วยผู้ใช้เข้าใจฟีเจอร์ต่างๆ ของ StockRadar "
-        "(Multi-Layer Scanner, Radar, วิเคราะห์หุ้น, Backtest, Stop Loss)\n"
-        "- อธิบาย indicator ทางเทคนิค (RSI, MACD, EMA, ATR, ADX, BB)\n"
+        "คุณคือ AI assistant ของ StockRadar (radarhoon.com) ระบบสแกนและวิเคราะห์หุ้น\n"
+        "คุณมี tools ให้ใช้เพื่อดึงข้อมูลจริงจากระบบ — ใช้ tools เสมอเมื่อ user ถามเรื่องหุ้นตัวใดตัวหนึ่ง "
+        "หรือขอให้หาหุ้นน่าสนใจ อย่าเดาหรือตอบโดยไม่มีข้อมูลจริง\n\n"
+        "หน้าที่:\n"
+        "- วิเคราะห์หุ้นด้วยข้อมูลจริงจาก tools\n"
+        "- อธิบายผลวิเคราะห์ให้ user เข้าใจ (RSI, MACD, EMA, layer ต่างๆ)\n"
         "- อธิบายระบบคะแนน: คะแนนดีมาก / คะแนนดี / เฝ้าดู / คะแนนต่ำ / คะแนนต่ำมาก\n"
-        "- ตอบเป็นภาษาไทย กระชับ ตรงประเด็น\n"
+        "- ตอบเป็นภาษาไทย กระชับ ตรงประเด็น\n\n"
         "ข้อห้าม:\n"
-        "- ห้ามแนะนำหุ้นเฉพาะเจาะจงให้ซื้อหรือขาย\n"
-        "- ไม่ใช่ที่ปรึกษาการเงิน ทุกการตัดสินใจลงทุนเป็นความรับผิดชอบของผู้ใช้"
+        "- ห้ามแนะนำให้ซื้อหรือขายหุ้นอย่างชัดเจน\n"
+        "- ไม่ใช่ที่ปรึกษาการเงิน ทุกการตัดสินใจเป็นความรับผิดชอบของผู้ใช้"
     )
 
     try:
         from google import genai as google_genai
         from google.genai import types as genai_types
+        from radar.ai_tools import get_tool_definitions, handle_tool_call
+
         client = google_genai.Client(api_key=api_key)
-        response = client.models.generate_content(
-            model="gemini-2.5-flash",
-            contents=history,
-            config=genai_types.GenerateContentConfig(
-                system_instruction=system_prompt,
-                temperature=0.7,
-            ),
+        tool_def = get_tool_definitions()
+        config = genai_types.GenerateContentConfig(
+            system_instruction=system_prompt,
+            tools=[tool_def],
+            temperature=0.7,
         )
-        ai_text = response.text.strip() if response.text else ""
+
+        # ── Function Calling Loop ────────────────────────────────────────────
+        contents = list(history)
+        MAX_ROUNDS = 5
+
+        for _ in range(MAX_ROUNDS):
+            response = client.models.generate_content(
+                model="gemini-2.5-flash",
+                contents=contents,
+                config=config,
+            )
+
+            # ตรวจว่า Gemini ขอ tool call ไหม
+            candidate = response.candidates[0] if response.candidates else None
+            if not candidate:
+                break
+
+            function_calls = [
+                part.function_call
+                for part in (candidate.content.parts or [])
+                if getattr(part, "function_call", None)
+            ]
+
+            if not function_calls:
+                break  # Gemini ตอบ text แล้ว — จบ loop
+
+            # Execute tools แล้วส่งผลกลับ Gemini
+            tool_response_parts = []
+            for fc in function_calls:
+                _logger.info("AI tool call: %s(%s)", fc.name, dict(fc.args))
+                result = handle_tool_call(fc.name, dict(fc.args), user)
+                tool_response_parts.append(
+                    genai_types.Part.from_function_response(
+                        name=fc.name,
+                        response={"result": result},
+                    )
+                )
+
+            # เพิ่ม Gemini's tool call + tool results เข้า contents
+            contents = list(contents) + [
+                candidate.content,
+                genai_types.Content(role="user", parts=tool_response_parts),
+            ]
+        # ────────────────────────────────────────────────────────────────────
+
+        ai_text = (response.text or "").strip()
         if ai_text:
             ChatMessage.objects.create(
                 sender=admin_user,
@@ -1976,6 +2021,7 @@ def _try_ai_reply(user, admin_user, user_message: str):
                 body=ai_text,
                 is_ai_response=True,
             )
+
     except Exception as e:
         import logging
         logging.getLogger(__name__).error("AI reply error: %s", e)
