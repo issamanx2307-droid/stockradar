@@ -86,6 +86,7 @@ export default function Chat({ onRead }: { onRead?: () => void }) {
     <div style={{
       width: "100%", padding: "16px 20px",
       display: "flex", flexDirection: "column", height: "calc(100vh - 56px)",
+      overflow: "hidden", boxSizing: "border-box",
     }}>
       {/* Header */}
       <div style={{
