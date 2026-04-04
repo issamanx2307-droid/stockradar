@@ -1907,8 +1907,14 @@ def chat_send(request):
         ).delete()
 
     # ── AI Auto-Reply (เฉพาะเมื่อ user ธรรมดาส่ง + AI เปิดอยู่) ──────────────
+    # รันใน background thread เพื่อไม่บล็อก HTTP response
     if not is_admin:
-        _try_ai_reply(request.user, receiver, body)
+        import threading
+        threading.Thread(
+            target=_try_ai_reply,
+            args=(request.user, receiver, body),
+            daemon=True,
+        ).start()
 
     return Response({
         "id":             msg.id,
