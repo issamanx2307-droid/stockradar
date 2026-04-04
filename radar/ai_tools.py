@@ -265,38 +265,216 @@ def _handle_get_stock_analysis(symbol: str, days: int = 120) -> dict:
         .first()
     )
 
+    def _pct(a, b, digits=2):
+        """(a - b) / b * 100 — คืน None ถ้า b=0 หรือ None"""
+        if a is None or b is None or b == 0:
+            return None
+        return round((float(a) - float(b)) / float(b) * 100, digits)
+
+    def _pct_of(num, denom, digits=2):
+        """num / denom * 100"""
+        if num is None or denom is None or denom == 0:
+            return None
+        return round(float(num) / float(denom) * 100, digits)
+
+    close = float(last["close"])
+
     if ind_obj:
         vol       = int(last["volume"]) if last.get("volume") else None
         avg20     = ind_obj["volume_avg20"]
         vol_ratio = round(vol / avg20, 2) if vol and avg20 else None
 
+        # raw indicators
+        ema20  = _f(ind_obj["ema20"])
+        ema50  = _f(ind_obj["ema50"])
+        ema200 = _f(ind_obj["ema200"])
+        rsi    = _f(ind_obj["rsi"], 1)
+        macd_v = _f(ind_obj["macd"], 4)
+        macd_s = _f(ind_obj["macd_signal"], 4)
+        macd_h = _f(ind_obj["macd_hist"], 4)
+        bb_u   = _f(ind_obj["bb_upper"])
+        bb_m   = _f(ind_obj["bb_middle"])
+        bb_l   = _f(ind_obj["bb_lower"])
+        atr14  = _f(ind_obj["atr14"], 4)
+        atr30  = _f(ind_obj["atr_avg30"], 4)
+        adx    = _f(ind_obj["adx14"], 1)
+        dip    = _f(ind_obj["di_plus"], 1)
+        dim    = _f(ind_obj["di_minus"], 1)
+        hh20   = _f(ind_obj["highest_high_20"])
+        ll20   = _f(ind_obj["lowest_low_20"])
+
         result["indicators"] = {
-            "ema20":           _f(ind_obj["ema20"]),
-            "ema50":           _f(ind_obj["ema50"]),
-            "ema200":          _f(ind_obj["ema200"]),
-            "rsi":             _f(ind_obj["rsi"], 1),
-            "macd":            _f(ind_obj["macd"], 4),
-            "macd_signal":     _f(ind_obj["macd_signal"], 4),
-            "macd_hist":       _f(ind_obj["macd_hist"], 4),
-            "bb_upper":        _f(ind_obj["bb_upper"]),
-            "bb_middle":       _f(ind_obj["bb_middle"]),
-            "bb_lower":        _f(ind_obj["bb_lower"]),
-            "atr14":           _f(ind_obj["atr14"], 4),
-            "atr_avg30":       _f(ind_obj["atr_avg30"], 4),
-            "adx14":           _f(ind_obj["adx14"], 1),
-            "di_plus":         _f(ind_obj["di_plus"], 1),
-            "di_minus":        _f(ind_obj["di_minus"], 1),
-            "highest_high_20": _f(ind_obj["highest_high_20"]),
-            "lowest_low_20":   _f(ind_obj["lowest_low_20"]),
-            "volume":          vol,
-            "volume_avg20":    int(avg20) if avg20 else None,
-            "volume_ratio":    vol_ratio,
+            "ema20": ema20, "ema50": ema50, "ema200": ema200,
+            "rsi": rsi,
+            "macd": macd_v, "macd_signal": macd_s, "macd_hist": macd_h,
+            "bb_upper": bb_u, "bb_middle": bb_m, "bb_lower": bb_l,
+            "atr14": atr14, "atr_avg30": atr30,
+            "adx14": adx, "di_plus": dip, "di_minus": dim,
+            "highest_high_20": hh20, "lowest_low_20": ll20,
+            "volume": vol, "volume_avg20": int(avg20) if avg20 else None,
+            "volume_ratio": vol_ratio,
+            "_null_fields": [],  # จะเติมด้านล่าง
         }
-        # บอก Gemini ว่า field ไหน null เพื่อไม่ให้เดา
         result["indicators"]["_null_fields"] = [
             k for k, v in result["indicators"].items()
             if v is None and not k.startswith("_")
         ]
+
+        # ── Derived values — คำนวณทุก indicator พร้อมบริบทให้ Gemini อธิบาย ──────
+        derived = {}
+
+        # EMA Trend
+        derived["ema"] = {
+            "price_vs_ema20_pct":    _pct(close, ema20),
+            "price_vs_ema50_pct":    _pct(close, ema50),
+            "price_vs_ema200_pct":   _pct(close, ema200),
+            "ema20_vs_ema50_pct":    _pct(ema20, ema50),
+            "ema50_vs_ema200_pct":   _pct(ema50, ema200),
+            "interpretation": (
+                "Strong Uptrend: EMA20>EMA50>EMA200 และราคาเหนือ EMA50" if (ema20 and ema50 and ema200 and ema20 > ema50 > ema200 and close > ema50) else
+                "Weak Uptrend: EMA20>EMA50 แต่ยังต่ำกว่า EMA200" if (ema20 and ema50 and ema200 and ema20 > ema50 and close > ema50 and ema50 <= ema200) else
+                "Strong Downtrend: EMA20<EMA50<EMA200" if (ema20 and ema50 and ema200 and ema20 < ema50 < ema200 and close < ema50) else
+                "Downtrend: EMA20<EMA50" if (ema20 and ema50 and ema20 < ema50 and close < ema50) else
+                "Sideways: EMA20≈EMA50" if (ema20 and ema50 and abs(ema20-ema50)/ema50*100 < 1.0) else
+                "Mixed: EMA alignment ไม่ชัดเจน"
+            ),
+        }
+
+        # RSI
+        if rsi is not None:
+            derived["rsi"] = {
+                "value": rsi,
+                "zone": (
+                    "Oversold — ขายมากเกินไป เสี่ยงเด้งกลับ" if rsi < 35 else
+                    "Healthy BUY zone — มีโมเมนตัมขึ้นและยังมีที่ไป" if 40 <= rsi <= 65 else
+                    "Overbought — ซื้อมากเกินไป เสี่ยงปรับฐาน" if rsi > 70 else
+                    "Neutral zone"
+                ),
+                "room_to_overbought": round(70 - rsi, 1),
+                "room_to_oversold":   round(rsi - 35, 1),
+                "interpretation": (
+                    f"RSI={rsi} ยังมีที่ไปอีก {round(70-rsi,1)} จุดก่อนถึง Overbought (70)" if rsi <= 65 else
+                    f"RSI={rsi} เข้าโซน Overbought แล้ว เสี่ยงปรับฐาน" if rsi > 70 else
+                    f"RSI={rsi} ใกล้ Overbought เหลืออีก {round(70-rsi,1)} จุด"
+                ),
+            }
+
+        # MACD
+        if macd_v is not None and macd_s is not None:
+            derived["macd"] = {
+                "macd_above_signal": macd_v > macd_s,
+                "hist_sign":         "positive (momentum ขึ้น)" if macd_h and macd_h > 0 else "negative (momentum ลง)",
+                "crossover_gap":     _f(macd_v - macd_s if macd_v and macd_s else None, 4),
+                "interpretation": (
+                    "MACD เหนือ Signal + Hist บวก = momentum ขาขึ้น" if macd_v > macd_s and macd_h and macd_h > 0 else
+                    "MACD ต่ำกว่า Signal + Hist ลบ = momentum ขาลง" if macd_v < macd_s and macd_h and macd_h < 0 else
+                    "MACD เหนือ Signal แต่ Hist ลดลง = momentum อ่อนลง" if macd_v > macd_s else
+                    "MACD ต่ำกว่า Signal แต่ Hist เพิ่มขึ้น = momentum เริ่มฟื้น"
+                ),
+            }
+
+        # Bollinger Bands
+        if bb_u and bb_m and bb_l:
+            bb_width = bb_u - bb_l
+            bb_pos   = (close - bb_l) / bb_width * 100 if bb_width > 0 else None
+            derived["bollinger_bands"] = {
+                "bb_width_pct":       _pct_of(bb_width, bb_m),
+                "bb_position_pct":    round(bb_pos, 1) if bb_pos is not None else None,
+                "dist_to_upper_pct":  _pct(bb_u, close),
+                "dist_to_lower_pct":  _pct(close, bb_l),
+                "dist_to_middle_pct": _pct(close, bb_m),
+                "is_squeeze":         (bb_width / bb_m * 100) < 5.0 if bb_m else None,
+                "interpretation": (
+                    f"ราคาอยู่ที่ {round(bb_pos,1)}% ของ BB — " + (
+                        f"ใกล้แนวต้าน BB Upper ({bb_u}) เหลือ {_pct(bb_u,close)}% — เสี่ยงชะลอ" if bb_pos and bb_pos > 80 else
+                        f"ใกล้แนวรับ BB Lower ({bb_l}) ห่าง {_pct(close,bb_l)}% — โซนพิจารณาซื้อ" if bb_pos and bb_pos < 20 else
+                        f"อยู่กลาง BB ห่างบน {_pct(bb_u,close)}% ห่างล่าง {_pct(close,bb_l)}%"
+                    )
+                ),
+                "squeeze_note": "BB กำลัง Squeeze แคบ — อาจใกล้ Breakout" if bb_m and (bb_width/bb_m*100) < 5 else None,
+            }
+
+        # ATR
+        if atr14:
+            atr_pct = atr14 / close * 100
+            atr_vs_avg = _pct(atr14, atr30) if atr30 else None
+            derived["atr"] = {
+                "atr14_pct":           round(atr_pct, 2),
+                "atr_vs_avg30_pct":    atr_vs_avg,
+                "stop_loss_1x_atr":    round(close - atr14, 2),
+                "stop_loss_1_5x_atr":  round(close - 1.5 * atr14, 2),
+                "stop_loss_2x_atr":    round(close - 2.0 * atr14, 2),
+                "risk_per_share_1_5x": round(1.5 * atr14, 2),
+                "interpretation": (
+                    f"ATR={atr14} ({round(atr_pct,2)}% ของราคา) — "
+                    f"หุ้นผันผวนเฉลี่ยวันละ ~{round(atr_pct,1)}% หรือ {round(atr14,2)} บาท\n"
+                    f"Stop Loss แนะนำ (1.5×ATR): {round(close-1.5*atr14,2)} บาท "
+                    f"(ความเสี่ยง {round(1.5*atr14,2)} บาท/หุ้น)\n" +
+                    (f"ผันผวนสูงกว่าปกติ {abs(round(atr_vs_avg,1))}% — ระวังเพิ่ม" if atr_vs_avg and atr_vs_avg > 20 else
+                     f"ผันผวนต่ำกว่าปกติ {abs(round(atr_vs_avg,1))}% — ตลาดนิ่ง" if atr_vs_avg and atr_vs_avg < -20 else
+                     "ผันผวนอยู่ในระดับปกติ") if atr30 else ""
+                ),
+            }
+
+        # ADX / DMI
+        if adx is not None:
+            di_spread = round(dip - dim, 1) if dip and dim else None
+            derived["adx_dmi"] = {
+                "adx_strength": (
+                    "Very Weak — ไม่มี trend (<15)" if adx < 15 else
+                    "Weak — trend เริ่มก่อตัว (15-20)" if adx < 20 else
+                    "Developing — trend กำลังพัฒนา (20-25)" if adx < 25 else
+                    "Strong — trend แข็งแกร่ง (25-40)" if adx < 40 else
+                    "Very Strong — trend แรงมาก (>40)"
+                ),
+                "di_dominance":  "Bullish (DI+>DI-)" if dip and dim and dip > dim else "Bearish (DI->DI+)" if dip and dim and dim > dip else "Neutral",
+                "di_spread":     di_spread,
+                "interpretation": (
+                    f"ADX={adx} {('trend แข็งแกร่ง' if adx >= 25 else 'trend อ่อน')} | "
+                    f"DI+={dip} vs DI-={dim} → "
+                    f"{'แนวโน้มขึ้น ห่างกัน ' + str(di_spread) + ' จุด' if dip and dim and dip > dim else 'แนวโน้มลง ห่างกัน ' + str(abs(di_spread) if di_spread else '?') + ' จุด'}"
+                ) if adx and dip and dim else f"ADX={adx}",
+            }
+
+        # Volume
+        if vol and avg20:
+            vol_diff_pct = (vol - avg20) / avg20 * 100
+            derived["volume"] = {
+                "vs_avg20_pct":    round(vol_diff_pct, 1),
+                "status": (
+                    f"สูงกว่าเฉลี่ยมาก (+{round(vol_diff_pct,1)}%) — มีแรงซื้อ/ขายผิดปกติ สัญญาณยืนยันแรง" if vol_diff_pct > 50 else
+                    f"สูงกว่าเฉลี่ย (+{round(vol_diff_pct,1)}%) — ปริมาณดี สัญญาณน่าเชื่อถือ" if vol_diff_pct > 0 else
+                    f"ต่ำกว่าเฉลี่ย ({round(vol_diff_pct,1)}%) — ปริมาณเบาบาง สัญญาณน้ำหนักน้อย"
+                ),
+                "interpretation": (
+                    f"วันนี้ {vol:,} หุ้น เทียบเฉลี่ย 20 วัน {avg20:,} หุ้น "
+                    f"({'สูงกว่า' if vol_diff_pct > 0 else 'ต่ำกว่า'}เฉลี่ย {abs(round(vol_diff_pct,1))}%)\n"
+                    f"Volume Ratio: {vol_ratio}× — "
+                    f"{'ยืนยันสัญญาณได้ดี' if vol_ratio and vol_ratio >= 1.5 else 'สัญญาณน้ำหนักพอใช้' if vol_ratio and vol_ratio >= 1.0 else 'ปริมาณน้อย ควรระวัง'}"
+                ),
+            }
+
+        # Support / Resistance Range (High20 / Low20)
+        if hh20 and ll20 and hh20 > ll20:
+            price_range = hh20 - ll20
+            range_pos   = (close - ll20) / price_range * 100
+            derived["range_20d"] = {
+                "dist_to_high20_pct":  _pct(hh20, close),
+                "dist_to_low20_pct":   _pct(close, ll20),
+                "range_position_pct":  round(range_pos, 1),
+                "range_width_pct":     _pct_of(price_range, close),
+                "interpretation": (
+                    f"ราคาอยู่ที่ {round(range_pos,1)}% ของ Range 20 วัน "
+                    f"(ต่ำสุด {ll20} — สูงสุด {hh20})\n"
+                    f"ห่างจากจุดสูงสุด {_pct(hh20,close)}% | ห่างจากจุดต่ำสุด {_pct(close,ll20)}%\n" +
+                    ("ราคาใกล้จุดสูงสุด 20 วัน — อาจแนวต้านแข็ง" if range_pos > 80 else
+                     "ราคาใกล้จุดต่ำสุด 20 วัน — บริเวณแนวรับ" if range_pos < 20 else
+                     "ราคาอยู่กลาง Range — ยังไม่ถึงแนวรับ/ต้านที่ชัด")
+                ),
+            }
+
+        result["derived"] = derived
+
     else:
         result["indicators"] = {
             "rsi":       _f(last.get("rsi"), 1),
@@ -307,6 +485,7 @@ def _handle_get_stock_analysis(symbol: str, days: int = 120) -> dict:
             "_null_fields": ["bb_upper", "bb_middle", "bb_lower", "atr14", "adx14",
                              "di_plus", "di_minus", "volume_avg20"],
         }
+        result["derived"] = {}
 
     # ── Layer details (pass + detail จาก engine) ──────────────────────────────
     simplified_layers = {}
