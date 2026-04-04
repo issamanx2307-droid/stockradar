@@ -898,9 +898,15 @@ body {
     overflow-y: hidden;
     border-right: none;
     border-bottom: 1px solid var(--border);
-    position: sticky;
+    position: fixed;
     top: 0;
-    z-index: 100;
+    left: 0;
+    right: 0;
+    z-index: 200;
+  }
+
+  .main-content {
+    padding-top: 56px;
   }
 
   .sidebar-logo { display: none; }
