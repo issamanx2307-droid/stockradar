@@ -2,6 +2,135 @@ import { useState, useEffect, useRef } from "react"
 import { api } from "../api/client"
 import { ChatMessageInfo } from "../api/types"
 
+// ── Order Proposal ─────────────────────────────────────────────────────────
+interface OrderProposal {
+  order_id:    number
+  symbol:      string
+  side:        "buy" | "sell"
+  qty:         number
+  order_type:  string
+  limit_price: number | null
+  reasoning:   string
+}
+
+function parseOrderProposal(body: string): { text: string; proposal: OrderProposal | null } {
+  const MARKER = "|||ORDER_PROPOSAL|||"
+  const idx = body.indexOf(MARKER)
+  if (idx === -1) return { text: body, proposal: null }
+  try {
+    const text     = body.slice(0, idx).trim()
+    const proposal = JSON.parse(body.slice(idx + MARKER.length))
+    return { text, proposal }
+  } catch {
+    return { text: body, proposal: null }
+  }
+}
+
+function OrderConfirmCard({ proposal, onConfirm, onCancel }: {
+  proposal: OrderProposal
+  onConfirm: () => void
+  onCancel:  () => void
+}) {
+  const [loading, setLoading] = useState(false)
+  const [done, setDone]       = useState<"confirmed" | "cancelled" | null>(null)
+
+  async function handleConfirm() {
+    setLoading(true)
+    try {
+      await api.alpacaConfirmOrder(proposal.order_id)
+      setDone("confirmed")
+      onConfirm()
+    } catch {
+      alert("ส่ง order ไม่สำเร็จ กรุณาลองใหม่")
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  async function handleCancel() {
+    setLoading(true)
+    try {
+      await api.alpacaCancelOrder(proposal.order_id)
+      setDone("cancelled")
+      onCancel()
+    } catch {
+      alert("ยกเลิก order ไม่สำเร็จ กรุณาลองใหม่")
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const sideColor = proposal.side === "buy" ? "#2e7d32" : "#c62828"
+  const sideTh    = proposal.side === "buy" ? "ซื้อ" : "ขาย"
+
+  if (done === "confirmed") {
+    return (
+      <div style={{ marginTop: 12, padding: "10px 14px", borderRadius: 10, background: "rgba(46,125,50,0.1)", border: "1px solid #2e7d32", fontSize: 13 }}>
+        ✅ <strong>ส่ง Order สำเร็จ</strong> — {sideTh} {proposal.qty} หุ้น {proposal.symbol} @ {proposal.order_type.toUpperCase()}
+      </div>
+    )
+  }
+  if (done === "cancelled") {
+    return (
+      <div style={{ marginTop: 12, padding: "10px 14px", borderRadius: 10, background: "rgba(100,100,100,0.1)", border: "1px solid #888", fontSize: 13 }}>
+        ❌ <strong>ยกเลิก Order แล้ว</strong>
+      </div>
+    )
+  }
+
+  return (
+    <div style={{
+      marginTop: 12,
+      padding: "14px 16px",
+      borderRadius: 12,
+      background: "var(--bg-card)",
+      border: `2px solid ${sideColor}`,
+      fontSize: 13,
+    }}>
+      <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 8, color: sideColor }}>
+        📋 AI เสนอ Order — รอการยืนยัน
+      </div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 4, marginBottom: 10 }}>
+        <div><strong>หุ้น:</strong> {proposal.symbol}</div>
+        <div><strong>ทิศทาง:</strong> <span style={{ color: sideColor, fontWeight: 700 }}>{sideTh.toUpperCase()}</span></div>
+        <div><strong>จำนวน:</strong> {proposal.qty} หุ้น</div>
+        <div><strong>ประเภท:</strong> {proposal.order_type.toUpperCase()}{proposal.limit_price ? ` @ $${proposal.limit_price}` : ""}</div>
+        {proposal.reasoning && (
+          <div style={{ marginTop: 6, padding: "6px 10px", background: "rgba(0,0,0,0.04)", borderRadius: 6, color: "var(--text-muted)", fontSize: 12 }}>
+            💡 {proposal.reasoning}
+          </div>
+        )}
+      </div>
+      <div style={{ display: "flex", gap: 8 }}>
+        <button
+          onClick={handleConfirm}
+          disabled={loading}
+          style={{
+            flex: 1, padding: "8px 0", borderRadius: 8, border: "none",
+            background: sideColor, color: "#fff", fontWeight: 700,
+            cursor: loading ? "not-allowed" : "pointer", fontSize: 14,
+          }}
+        >
+          {loading ? "..." : "✅ ยืนยัน"}
+        </button>
+        <button
+          onClick={handleCancel}
+          disabled={loading}
+          style={{
+            flex: 1, padding: "8px 0", borderRadius: 8,
+            border: "1px solid var(--border)", background: "var(--bg-elevated)",
+            color: "var(--text-main)", fontWeight: 600,
+            cursor: loading ? "not-allowed" : "pointer", fontSize: 14,
+          }}
+        >
+          {loading ? "..." : "❌ ยกเลิก"}
+        </button>
+      </div>
+    </div>
+  )
+}
+
+// ── Main Chat Component ────────────────────────────────────────────────────
 export default function Chat({ onRead }: { onRead?: () => void }) {
   const [messages, setMessages]   = useState<ChatMessageInfo[]>([])
   const [input, setInput]         = useState("")
@@ -82,11 +211,10 @@ export default function Chat({ onRead }: { onRead?: () => void }) {
     })
   }
 
-  function renderBody(body: string, isAI: boolean) {
-    if (!isAI) return <span>{body}</span>
+  function renderLines(text: string) {
     return (
       <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-        {body.split("\n").map((line, i) => {
+        {text.split("\n").map((line, i) => {
           const parts = line.split(/(\*\*[^*]+\*\*)/g)
           return (
             <div key={i} style={{ minHeight: line.trim() === "" ? 6 : undefined }}>
@@ -98,6 +226,23 @@ export default function Chat({ onRead }: { onRead?: () => void }) {
             </div>
           )
         })}
+      </div>
+    )
+  }
+
+  function renderBody(body: string, isAI: boolean) {
+    if (!isAI) return <span>{body}</span>
+    const { text, proposal } = parseOrderProposal(body)
+    return (
+      <div>
+        {renderLines(text)}
+        {proposal && (
+          <OrderConfirmCard
+            proposal={proposal}
+            onConfirm={loadMessages}
+            onCancel={loadMessages}
+          />
+        )}
       </div>
     )
   }

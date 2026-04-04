@@ -134,6 +134,92 @@ def get_tool_definitions():
                     required=[],
                 ),
             ),
+            # ── Alpaca US Stock Trading ──────────────────────────────────────
+            genai_types.FunctionDeclaration(
+                name="get_alpaca_account",
+                description=(
+                    "ดูยอดเงินและสถานะ Alpaca Paper Trading account "
+                    "ใช้เมื่อ user ถามว่า 'มีเงินเท่าไหร่', 'ยอดเงินในพอร์ต', 'buying power เท่าไหร่'"
+                ),
+                parameters=genai_types.Schema(
+                    type=genai_types.Type.OBJECT,
+                    properties={},
+                    required=[],
+                ),
+            ),
+            genai_types.FunctionDeclaration(
+                name="get_alpaca_positions",
+                description=(
+                    "ดู positions หุ้น US ที่ถือไว้ปัจจุบันพร้อม unrealized P&L "
+                    "ใช้เมื่อ user ถามว่า 'ถือหุ้นอะไรอยู่', 'portfolio เป็นยังไง', 'กำไรขาดทุนเท่าไหร่'"
+                ),
+                parameters=genai_types.Schema(
+                    type=genai_types.Type.OBJECT,
+                    properties={},
+                    required=[],
+                ),
+            ),
+            genai_types.FunctionDeclaration(
+                name="get_us_stock_bars",
+                description=(
+                    "ดึงข้อมูลราคา OHLCV (Open/High/Low/Close/Volume) ของหุ้น US จาก Alpaca "
+                    "ใช้เพื่อวิเคราะห์ราคาหุ้น US ก่อนเสนอ order "
+                    "ใช้ก่อนเรียก propose_order เสมอ"
+                ),
+                parameters=genai_types.Schema(
+                    type=genai_types.Type.OBJECT,
+                    properties={
+                        "symbol": genai_types.Schema(
+                            type=genai_types.Type.STRING,
+                            description="ชื่อหุ้น US เช่น AAPL, TSLA, NVDA, MSFT, AMZN",
+                        ),
+                        "limit": genai_types.Schema(
+                            type=genai_types.Type.INTEGER,
+                            description="จำนวน bars ย้อนหลัง (10-60 แนะนำ 30)",
+                        ),
+                    },
+                    required=["symbol"],
+                ),
+            ),
+            genai_types.FunctionDeclaration(
+                name="propose_order",
+                description=(
+                    "เสนอ order ซื้อ/ขายหุ้น US ให้ user พิจารณาก่อน — "
+                    "ระบบจะบันทึก order ไว้รอ user กด ยืนยัน ก่อนส่งไป Alpaca "
+                    "ห้ามใช้ tool นี้โดยไม่ผ่านการวิเคราะห์ด้วย get_us_stock_bars ก่อน "
+                    "ห้ามเสนอมากกว่า 1 order ต่อการสนทนา 1 ครั้ง"
+                ),
+                parameters=genai_types.Schema(
+                    type=genai_types.Type.OBJECT,
+                    properties={
+                        "symbol": genai_types.Schema(
+                            type=genai_types.Type.STRING,
+                            description="ชื่อหุ้น US เช่น AAPL, TSLA",
+                        ),
+                        "side": genai_types.Schema(
+                            type=genai_types.Type.STRING,
+                            description="ทิศทาง: buy หรือ sell",
+                        ),
+                        "qty": genai_types.Schema(
+                            type=genai_types.Type.NUMBER,
+                            description="จำนวนหุ้น (เช่น 1, 5, 10) — ห้ามเสนอมากเกินสมเหตุสมผล",
+                        ),
+                        "order_type": genai_types.Schema(
+                            type=genai_types.Type.STRING,
+                            description="ประเภท order: market หรือ limit",
+                        ),
+                        "limit_price": genai_types.Schema(
+                            type=genai_types.Type.NUMBER,
+                            description="ราคา limit (ใส่เมื่อ order_type=limit เท่านั้น)",
+                        ),
+                        "reasoning": genai_types.Schema(
+                            type=genai_types.Type.STRING,
+                            description="เหตุผลที่เสนอ order นี้ — อธิบาย indicator ที่สนับสนุน เช่น RSI, MACD, trend",
+                        ),
+                    },
+                    required=["symbol", "side", "qty", "reasoning"],
+                ),
+            ),
         ]
     )
 
@@ -156,6 +242,26 @@ def handle_tool_call(name: str, args: dict, user) -> dict:
             )
         elif name == "get_user_watchlist":
             result = _handle_get_user_watchlist(user)
+        # ── Alpaca tools ─────────────────────────────────────────────────────
+        elif name == "get_alpaca_account":
+            result = _handle_get_alpaca_account()
+        elif name == "get_alpaca_positions":
+            result = _handle_get_alpaca_positions()
+        elif name == "get_us_stock_bars":
+            result = _handle_get_us_stock_bars(
+                symbol=args.get("symbol", ""),
+                limit=int(args.get("limit", 30)),
+            )
+        elif name == "propose_order":
+            result = _handle_propose_order(
+                user=user,
+                symbol=args.get("symbol", ""),
+                side=args.get("side", "buy"),
+                qty=float(args.get("qty", 1)),
+                order_type=args.get("order_type", "market"),
+                limit_price=args.get("limit_price"),
+                reasoning=args.get("reasoning", ""),
+            )
         else:
             result = {"error": f"ไม่รู้จัก tool: {name}"}
     except Exception as e:
@@ -579,3 +685,124 @@ def _handle_get_user_watchlist(user) -> dict:
         }
     except Watchlist.DoesNotExist:
         return {"data_available": True, "count": 0, "items": []}
+
+
+# ── Alpaca Handlers ───────────────────────────────────────────────────────────
+
+def _handle_get_alpaca_account() -> dict:
+    """ดูยอดเงิน Alpaca account"""
+    from radar import alpaca_service
+    try:
+        data = alpaca_service.get_account()
+        data["data_available"] = True
+        return data
+    except Exception as e:
+        return {"data_available": False, "error": f"ดึงข้อมูล account ไม่ได้: {str(e)}"}
+
+
+def _handle_get_alpaca_positions() -> dict:
+    """ดู positions ที่ถือไว้"""
+    from radar import alpaca_service
+    try:
+        positions = alpaca_service.get_positions()
+        total_pl = sum(p.get("unrealized_pl", 0) or 0 for p in positions)
+        return {
+            "data_available": True,
+            "count":          len(positions),
+            "total_unrealized_pl": round(total_pl, 2),
+            "positions":      positions,
+        }
+    except Exception as e:
+        return {"data_available": False, "error": f"ดึง positions ไม่ได้: {str(e)}"}
+
+
+def _handle_get_us_stock_bars(symbol: str, limit: int = 30) -> dict:
+    """ดึงราคา OHLCV หุ้น US จาก Alpaca"""
+    from radar import alpaca_service
+    symbol = symbol.upper().strip()
+    if not symbol:
+        return {"data_available": False, "error": "กรุณาระบุชื่อหุ้น US"}
+
+    limit = max(10, min(60, limit))
+    try:
+        bars = alpaca_service.get_bars(symbol=symbol, timeframe="1Day", limit=limit)
+        if not bars:
+            return {"data_available": False, "error": f"ไม่พบข้อมูลราคา {symbol}"}
+
+        # วิเคราะห์เบื้องต้น
+        closes    = [b["c"] for b in bars if b.get("c")]
+        latest    = bars[0] if bars else {}
+        close     = latest.get("c")
+        prev_close= bars[1].get("c") if len(bars) > 1 else None
+        change_pct= round((close - prev_close) / prev_close * 100, 2) if close and prev_close else None
+        high_n    = max(b["h"] for b in bars if b.get("h"))
+        low_n     = min(b["l"] for b in bars if b.get("l"))
+
+        return {
+            "data_available": True,
+            "symbol":         symbol,
+            "bars_count":     len(bars),
+            "latest": {
+                "date":   latest.get("t", "")[:10],
+                "open":   latest.get("o"),
+                "high":   latest.get("h"),
+                "low":    latest.get("l"),
+                "close":  close,
+                "volume": latest.get("v"),
+            },
+            "summary": {
+                "change_pct":     change_pct,
+                "direction":      "ขึ้น" if change_pct and change_pct > 0 else "ลง" if change_pct and change_pct < 0 else "ทรงตัว",
+                f"high_{limit}d": round(high_n, 2),
+                f"low_{limit}d":  round(low_n, 2),
+                f"range_{limit}d_pct": round((high_n - low_n) / low_n * 100, 2) if low_n else None,
+            },
+            "note": "ข้อมูลจาก IEX feed (real-time, US market hours) — paper trading account",
+        }
+    except Exception as e:
+        return {"data_available": False, "error": f"ดึงราคา {symbol} ไม่ได้: {str(e)}"}
+
+
+def _handle_propose_order(user, symbol: str, side: str, qty: float,
+                           order_type: str = "market", limit_price=None,
+                           reasoning: str = "") -> dict:
+    """บันทึก order ที่ AI เสนอ รอ user confirm — ไม่ส่ง order ไป Alpaca เอง"""
+    from radar.models import AlpacaOrder
+
+    symbol = symbol.upper().strip()
+    side   = side.lower().strip()
+
+    if not symbol:
+        return {"data_available": False, "error": "กรุณาระบุ symbol"}
+    if side not in ("buy", "sell"):
+        return {"data_available": False, "error": "side ต้องเป็น buy หรือ sell"}
+    if qty <= 0:
+        return {"data_available": False, "error": "qty ต้องมากกว่า 0"}
+
+    order = AlpacaOrder.objects.create(
+        user         = user,
+        symbol       = symbol,
+        side         = side,
+        qty          = qty,
+        order_type   = order_type or "market",
+        limit_price  = limit_price or None,
+        ai_reasoning = reasoning,
+        status       = "pending_confirm",
+    )
+
+    return {
+        "data_available": True,
+        "order_id":       order.id,
+        "status":         "pending_confirm",
+        "symbol":         symbol,
+        "side":           side,
+        "qty":            qty,
+        "order_type":     order.order_type,
+        "limit_price":    float(limit_price) if limit_price else None,
+        "reasoning":      reasoning,
+        "message":        (
+            f"บันทึก order เรียบร้อย — รอ user กดยืนยันก่อนส่งไป Alpaca\n"
+            f"order_id={order.id} | {side.upper()} {qty} {symbol} @ {order.order_type}"
+        ),
+        "__propose_order__": True,  # flag สำหรับ frontend ให้แสดง confirm card
+    }

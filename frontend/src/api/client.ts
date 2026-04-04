@@ -100,4 +100,10 @@ export const api = {
     apiFetch("/chat/messages/" + (user_id ? `?user_id=${user_id}` : "")),
   chatConversations: (): Promise<{ conversations: ChatConversation[] }> =>
     apiFetch("/chat/conversations/"),
+
+  // ── Alpaca ────────────────────────────────────────────────────────────────
+  alpacaConfirmOrder: (orderId: number): Promise<any> =>
+    apiFetch(`/alpaca/orders/${orderId}/confirm/`, { method: "POST", body: JSON.stringify({}) }),
+  alpacaCancelOrder: (orderId: number): Promise<any> =>
+    apiFetch(`/alpaca/orders/${orderId}/cancel/`, { method: "POST", body: JSON.stringify({}) }),
 }

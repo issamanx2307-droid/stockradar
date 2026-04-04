@@ -2035,7 +2035,27 @@ def _try_ai_reply(user, admin_user, user_message: str):
 
         "═══ ข้อห้าม ═══\n"
         "- ห้ามแนะนำให้ซื้อหรือขายหุ้นอย่างชัดเจน\n"
-        "- ไม่ใช่ที่ปรึกษาการเงิน ทุกการตัดสินใจเป็นความรับผิดชอบของผู้ใช้"
+        "- ไม่ใช่ที่ปรึกษาการเงิน ทุกการตัดสินใจเป็นความรับผิดชอบของผู้ใช้\n\n"
+
+        "═══ Alpaca US Stock Trading ═══\n"
+        "คุณมี tools สำหรับ US stock trading ผ่าน Alpaca Paper Trading:\n"
+        "  get_alpaca_account   → ดูยอดเงิน equity, cash, buying_power\n"
+        "  get_alpaca_positions → ดู positions ที่ถือไว้ พร้อม unrealized P&L\n"
+        "  get_us_stock_bars    → ดึงราคา OHLCV หุ้น US (AAPL, TSLA, NVDA ฯลฯ)\n"
+        "  propose_order        → เสนอ order ซื้อ/ขายรอ user confirm\n\n"
+        "กฎการใช้ Alpaca tools:\n"
+        "1. ก่อนเสนอ order ต้องเรียก get_us_stock_bars ก่อนเสมอ วิเคราะห์ราคาและ trend ก่อน\n"
+        "2. เสนอ order ได้ครั้งละ 1 order เท่านั้น\n"
+        "3. propose_order เป็นแค่การเสนอ — ระบบจะแสดง confirm card ให้ user กดยืนยันก่อนส่งไป Alpaca\n"
+        "4. ห้าม execute order เองโดยไม่ผ่าน user confirm\n"
+        "5. ขณะนี้เป็น Paper Trading — ไม่ใช้เงินจริง ใช้เงินจำลอง $100,000 USD\n"
+        "6. เมื่อเสนอ order ต้องอธิบาย reasoning ให้ชัดเจน: indicator ไหนสนับสนุน, stop loss แนะนำที่ไหน\n\n"
+        "ตัวอย่างการตอบหลัง propose_order:\n"
+        "  '✅ ฉันได้บันทึก order เรียบร้อยแล้ว — รอการยืนยันจากคุณ\n"
+        "   📋 รายละเอียด: BUY 5 หุ้น AAPL @ Market\n"
+        "   📊 เหตุผล: RSI=42 (oversold zone), MACD hist กลับเป็นบวก, ราคาใกล้ BB Lower\n"
+        "   ⚠️ Stop Loss แนะนำ: $xxx (1.5×ATR)\n"
+        "   กรุณากดปุ่มยืนยันเพื่อส่ง order ไป Alpaca'"
     )
 
     try:
@@ -2054,6 +2074,7 @@ def _try_ai_reply(user, admin_user, user_message: str):
         # ── Function Calling Loop ────────────────────────────────────────────
         contents = list(history)
         MAX_ROUNDS = 5
+        pending_order_info = None  # เก็บข้อมูล propose_order ถ้า AI เรียก
 
         for _ in range(MAX_ROUNDS):
             response = client.models.generate_content(
@@ -2081,6 +2102,17 @@ def _try_ai_reply(user, admin_user, user_message: str):
             for fc in function_calls:
                 _logger.info("AI tool call: %s(%s)", fc.name, dict(fc.args))
                 result = handle_tool_call(fc.name, dict(fc.args), user)
+                # ตรวจจับ propose_order — เก็บข้อมูลสำหรับ embed ใน ChatMessage
+                if fc.name == "propose_order" and result.get("__propose_order__"):
+                    pending_order_info = {
+                        "order_id":   result.get("order_id"),
+                        "symbol":     result.get("symbol"),
+                        "side":       result.get("side"),
+                        "qty":        result.get("qty"),
+                        "order_type": result.get("order_type"),
+                        "limit_price": result.get("limit_price"),
+                        "reasoning":  result.get("reasoning", ""),
+                    }
                 tool_response_parts.append(
                     genai_types.Part.from_function_response(
                         name=fc.name,
@@ -2097,10 +2129,17 @@ def _try_ai_reply(user, admin_user, user_message: str):
 
         ai_text = (response.text or "").strip()
         if ai_text:
+            # ถ้า AI เรียก propose_order → embed order info ท้ายข้อความ
+            # Frontend จะ parse และแสดง confirm card
+            body = ai_text
+            if pending_order_info:
+                import json as _json
+                body = ai_text + "\n|||ORDER_PROPOSAL|||" + _json.dumps(pending_order_info, ensure_ascii=False)
+
             ChatMessage.objects.create(
                 sender=admin_user,
                 receiver=user,
-                body=ai_text,
+                body=body,
                 is_ai_response=True,
             )
 
