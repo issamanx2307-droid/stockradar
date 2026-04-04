@@ -7,6 +7,19 @@ import numpy as np
 
 logger = logging.getLogger(__name__)
 
+
+def _sanitize(obj):
+    """แปลง NaN/Inf → None เพื่อให้ serialize เป็น JSON ได้"""
+    import math
+    if isinstance(obj, float):
+        return None if (math.isnan(obj) or math.isinf(obj)) else obj
+    if isinstance(obj, dict):
+        return {k: _sanitize(v) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [_sanitize(v) for v in obj]
+    return obj
+
+
 # ─── Label ภาษาไทย ────────────────────────────────────────────────────────────
 
 SETUP_LABEL_TH = {
@@ -89,20 +102,22 @@ def handle_tool_call(name: str, args: dict, user) -> dict:
     """รับ tool call จาก Gemini แล้วส่งไปยัง handler ที่ถูกต้อง"""
     try:
         if name == "get_stock_analysis":
-            return _handle_get_stock_analysis(args.get("symbol", ""))
+            result = _handle_get_stock_analysis(args.get("symbol", ""))
         elif name == "get_scanner_results":
-            return _handle_get_scanner_results(
+            result = _handle_get_scanner_results(
                 setup=args.get("setup"),
                 min_layers=int(args.get("min_layers", 2)),
                 exchange=args.get("exchange"),
             )
         elif name == "get_user_watchlist":
-            return _handle_get_user_watchlist(user)
+            result = _handle_get_user_watchlist(user)
         else:
-            return {"error": f"ไม่รู้จัก tool: {name}"}
+            result = {"error": f"ไม่รู้จัก tool: {name}"}
     except Exception as e:
         logger.error("Tool %s error: %s", name, e)
-        return {"error": str(e)}
+        result = {"error": str(e)}
+
+    return _sanitize(result)
 
 
 # ─── Handlers ─────────────────────────────────────────────────────────────────
