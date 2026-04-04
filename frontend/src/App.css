@@ -979,7 +979,7 @@ body {
   .nav-btn {
     flex-direction: column;
     padding: 6px 10px;
-    min-width: 60px;
+    min-width: 80px;
     font-size: 10px;
     gap: 2px;
     white-space: nowrap;
@@ -1029,7 +1029,7 @@ body {
 }
 
 @media (max-width: 480px) {
-  .nav-btn { min-width: 50px; padding: 4px 8px; }
+  .nav-btn { min-width: 80px; padding: 4px 8px; }
   .page-title { font-size: 15px !important; }
   .stat-value { font-size: 18px !important; }
   .stats-grid { gap: 8px !important; }
