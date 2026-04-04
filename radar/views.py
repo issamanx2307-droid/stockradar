@@ -206,21 +206,34 @@ def dashboard_summary(request):
 
 class SymbolListView(generics.ListAPIView):
     serializer_class = SymbolSerializer
-    filter_backends  = [filters.SearchFilter, filters.OrderingFilter]
-    search_fields    = ["symbol", "name", "sector"]
+    filter_backends  = [filters.OrderingFilter]
     ordering_fields  = ["symbol", "exchange", "sector"]
     ordering         = ["symbol"]
 
     def get_queryset(self):
+        from django.db.models import Case, When, IntegerField, Value, Q
         qs = Symbol.objects.all()
         p  = self.request.query_params
         ex = p.get("exchange")
         sc = p.get("sector")
+        search = p.get("search", "").strip()
         if ex:
             qs = qs.filter(exchange__in=["NASDAQ","NYSE"]) if ex.upper()=="US" \
                  else qs.filter(exchange=ex.upper())
         if sc:
             qs = qs.filter(sector__icontains=sc)
+        if search:
+            qs = qs.filter(
+                Q(symbol__icontains=search) | Q(name__icontains=search)
+            ).annotate(
+                _priority=Case(
+                    When(symbol__iexact=search, then=Value(0)),
+                    When(symbol__istartswith=search, then=Value(1)),
+                    When(symbol__icontains=search, then=Value(2)),
+                    default=Value(3),
+                    output_field=IntegerField(),
+                )
+            ).order_by("_priority", "symbol")
         return qs
 
     def get_paginator(self):
