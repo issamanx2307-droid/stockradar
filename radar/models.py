@@ -876,3 +876,38 @@ class SiteSetting(models.Model):
     def get(cls):
         obj, _ = cls.objects.get_or_create(pk=1)
         return obj
+
+
+# ── Alpaca US Stock Trading ──────────────────────────────────────────────────
+
+class AlpacaOrder(models.Model):
+    SIDE_CHOICES = [("buy", "Buy"), ("sell", "Sell")]
+    TYPE_CHOICES = [("market", "Market"), ("limit", "Limit")]
+    STATUS_CHOICES = [
+        ("pending_confirm", "รอยืนยัน"),
+        ("submitted",       "ส่งแล้ว"),
+        ("filled",          "สำเร็จ"),
+        ("cancelled",       "ยกเลิก"),
+        ("rejected",        "ถูกปฏิเสธ"),
+    ]
+
+    user            = models.ForeignKey(User, on_delete=models.CASCADE, related_name="alpaca_orders", verbose_name="ผู้ใช้")
+    symbol          = models.CharField(max_length=20, verbose_name="หุ้น")
+    side            = models.CharField(max_length=4, choices=SIDE_CHOICES, verbose_name="ทิศทาง")
+    qty             = models.DecimalField(max_digits=12, decimal_places=4, verbose_name="จำนวนหุ้น")
+    order_type      = models.CharField(max_length=10, choices=TYPE_CHOICES, default="market", verbose_name="ประเภท Order")
+    limit_price     = models.DecimalField(max_digits=14, decimal_places=4, null=True, blank=True, verbose_name="ราคา Limit")
+    status          = models.CharField(max_length=20, choices=STATUS_CHOICES, default="pending_confirm", verbose_name="สถานะ")
+    alpaca_order_id = models.CharField(max_length=100, blank=True, verbose_name="Alpaca Order ID")
+    ai_reasoning    = models.TextField(blank=True, verbose_name="เหตุผลที่ AI เสนอ")
+    created_at      = models.DateTimeField(auto_now_add=True, verbose_name="สร้างเมื่อ")
+    confirmed_at    = models.DateTimeField(null=True, blank=True, verbose_name="ยืนยันเมื่อ")
+
+    class Meta:
+        verbose_name        = "Alpaca Order"
+        verbose_name_plural = "Alpaca Orders"
+        ordering            = ["-created_at"]
+        indexes             = [models.Index(fields=["user", "status"]), models.Index(fields=["alpaca_order_id"])]
+
+    def __str__(self):
+        return f"{self.side.upper()} {self.qty} {self.symbol} [{self.get_status_display()}]"

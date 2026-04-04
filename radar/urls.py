@@ -63,4 +63,14 @@ urlpatterns = [
     path("chat/send/",                 views.chat_send,              name="chat-send"),
     path("chat/messages/",             views.chat_messages,          name="chat-messages"),
     path("chat/conversations/",        views.chat_conversations,     name="chat-conversations"),
+    # ── Alpaca US Stock Trading ──
+    path("alpaca/account/",                          views.alpaca_account,        name="alpaca-account"),
+    path("alpaca/positions/",                        views.alpaca_positions,      name="alpaca-positions"),
+    path("alpaca/orders/",                           views.alpaca_orders,         name="alpaca-orders"),
+    path("alpaca/orders/propose/",                   views.alpaca_propose_order,  name="alpaca-propose"),
+    path("alpaca/orders/<int:order_id>/confirm/",    views.alpaca_confirm_order,  name="alpaca-confirm"),
+    path("alpaca/orders/<int:order_id>/cancel/",     views.alpaca_cancel_order,   name="alpaca-cancel"),
+    path("alpaca/portfolio/",                        views.alpaca_portfolio,      name="alpaca-portfolio"),
+    path("alpaca/clock/",                            views.alpaca_market_clock,   name="alpaca-clock"),
+    path("alpaca/bars/",                             views.alpaca_bars,           name="alpaca-bars"),
 ]

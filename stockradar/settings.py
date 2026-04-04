@@ -287,6 +287,18 @@ GOOGLE_AI_API_KEY = os.environ.get("GOOGLE_AI_API_KEY", "")
 AI_CHAT_DAILY_LIMIT = int(os.environ.get("AI_CHAT_DAILY_LIMIT", 30))
 
 # ---------------------------------------------------------------------------
+# Alpaca US Stock Trading
+# ---------------------------------------------------------------------------
+# ตั้งค่าใน .env:
+# ALPACA_API_KEY=...
+# ALPACA_SECRET_KEY=...
+# ALPACA_BASE_URL=https://paper-api.alpaca.markets   (paper)
+# ALPACA_BASE_URL=https://api.alpaca.markets         (live)
+ALPACA_API_KEY    = os.environ.get("ALPACA_API_KEY", "")
+ALPACA_SECRET_KEY = os.environ.get("ALPACA_SECRET_KEY", "")
+ALPACA_BASE_URL   = os.environ.get("ALPACA_BASE_URL", "https://paper-api.alpaca.markets")
+
+# ---------------------------------------------------------------------------
 # Jazzmin Settings (Admin UI Customization)
 # ---------------------------------------------------------------------------
 

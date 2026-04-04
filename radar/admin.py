@@ -5,7 +5,7 @@ Django Admin สำหรับระบบ Radar หุ้น (ภาษาไ�
 from django.contrib import admin
 from django.utils.html import format_html
 from django.db.models import Q
-from .models import Profile, BusinessProfile, StockTerm, SubscriptionPlan, Subscription, ChatMessage, SiteSetting
+from .models import Profile, BusinessProfile, StockTerm, SubscriptionPlan, Subscription, ChatMessage, SiteSetting, AlpacaOrder
 
 # ---------------------------------------------------------------------------
 # Business Profile
@@ -377,3 +377,48 @@ class SiteSettingAdmin(admin.ModelAdmin):
 
     def has_delete_permission(self, request, obj=None):
         return False
+
+
+# ── Alpaca Orders ─────────────────────────────────────────────────────────────
+
+@admin.register(AlpacaOrder)
+class AlpacaOrderAdmin(admin.ModelAdmin):
+    list_display   = ("id", "user", "symbol", "side_badge", "qty", "order_type", "status_badge", "created_at", "confirmed_at")
+    list_filter    = ("status", "side", "order_type")
+    search_fields  = ("symbol", "user__username", "alpaca_order_id")
+    readonly_fields = ("alpaca_order_id", "created_at", "confirmed_at", "ai_reasoning")
+    ordering       = ("-created_at",)
+
+    fieldsets = (
+        ("Order Info", {
+            "fields": ("user", "symbol", "side", "qty", "order_type", "limit_price", "status")
+        }),
+        ("Alpaca", {
+            "fields": ("alpaca_order_id", "confirmed_at")
+        }),
+        ("AI Reasoning", {
+            "fields": ("ai_reasoning",),
+            "classes": ("collapse",),
+        }),
+        ("System", {
+            "fields": ("created_at",),
+            "classes": ("collapse",),
+        }),
+    )
+
+    @admin.display(description="ทิศทาง")
+    def side_badge(self, obj):
+        color = "green" if obj.side == "buy" else "red"
+        return format_html('<b style="color:{}">{}</b>', color, obj.side.upper())
+
+    @admin.display(description="สถานะ")
+    def status_badge(self, obj):
+        colors = {
+            "pending_confirm": "orange",
+            "submitted":       "blue",
+            "filled":          "green",
+            "cancelled":       "gray",
+            "rejected":        "red",
+        }
+        color = colors.get(obj.status, "black")
+        return format_html('<span style="color:{};font-weight:bold">{}</span>', color, obj.get_status_display())
