@@ -176,6 +176,60 @@ def get_bars(symbol, timeframe="1Day", limit=60):
     return bars
 
 
+def get_bars_multi(symbols, timeframe="1Day", start=None, end=None, limit=200):
+    """
+    ดึง OHLCV bars หลาย symbols ใน 1 request
+    Alpaca multi-bar endpoint: GET /v2/stocks/bars?symbols=AAPL,TSLA,...
+    คืน dict: { "AAPL": [bars], "TSLA": [bars], ... }
+    """
+    params = {
+        "symbols":   ",".join(s.upper() for s in symbols),
+        "timeframe": timeframe,
+        "limit":     limit,
+        "feed":      "iex",
+        "sort":      "asc",
+    }
+    if start:
+        params["start"] = start if isinstance(start, str) else start.isoformat()
+    if end:
+        params["end"] = end if isinstance(end, str) else end.isoformat()
+
+    result = {}
+    page_token = None
+
+    while True:
+        if page_token:
+            params["page_token"] = page_token
+
+        r = requests.get(
+            f"{DATA_URL}/v2/stocks/bars",
+            headers=_headers(),
+            params=params,
+            timeout=30,
+        )
+        r.raise_for_status()
+        data = r.json()
+
+        for sym, bars_raw in data.get("bars", {}).items():
+            if sym not in result:
+                result[sym] = []
+            for b in bars_raw:
+                result[sym].append({
+                    "t": b.get("t"),
+                    "o": b.get("o"),
+                    "h": b.get("h"),
+                    "l": b.get("l"),
+                    "c": b.get("c"),
+                    "v": b.get("v"),
+                })
+
+        page_token = data.get("next_page_token")
+        if not page_token:
+            break
+
+    return result
+
+
 def get_latest_quote(symbol):
     """ดูราคาล่าสุด (bid/ask) ของหุ้น US"""
     r = requests.get(

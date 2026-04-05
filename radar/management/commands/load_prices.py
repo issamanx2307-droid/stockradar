@@ -288,30 +288,95 @@ class Command(BaseCommand):
         failed = 0
         skipped = 0
         
-        # แบ่งเป็น batches
+        # แยก US vs SET — US ใช้ Alpaca, SET ใช้ Yahoo/Stooq
+        us_symbols = [s for s in symbols if s.exchange in ("NASDAQ", "NYSE")]
+        set_symbols = [s for s in symbols if s.exchange == "SET"]
+
+        # ── US: ใช้ Alpaca ─────────────────────────────────────────────────
+        if us_symbols:
+            self.stdout.write(f"\n📊 US stocks ({len(us_symbols)}) — Alpaca Data API")
+            from radar import alpaca_service
+            from decimal import Decimal as D, InvalidOperation
+
+            for i in range(0, len(us_symbols), batch_size):
+                batch_syms = us_symbols[i:i + batch_size]
+                sym_names = [s.symbol for s in batch_syms]
+                sym_map = {s.symbol: s for s in batch_syms}
+
+                try:
+                    bars_data = alpaca_service.get_bars_multi(
+                        symbols=sym_names,
+                        timeframe="1Day",
+                        start=start_date,
+                        limit=options["days"] + 50,
+                    )
+                    for sym_str, bars in bars_data.items():
+                        sym_obj = sym_map.get(sym_str)
+                        if not sym_obj or not bars:
+                            skipped += 1
+                            continue
+                        rows = []
+                        for b in bars:
+                            ts = b.get("t", "")
+                            if not ts:
+                                continue
+                            try:
+                                rows.append({
+                                    "date":   date.fromisoformat(ts[:10]),
+                                    "open":   D(str(b["o"])),
+                                    "high":   D(str(b["h"])),
+                                    "low":    D(str(b["l"])),
+                                    "close":  D(str(b["c"])),
+                                    "volume": int(b.get("v", 0)),
+                                })
+                            except (KeyError, ValueError, InvalidOperation):
+                                pass
+                        if rows:
+                            saved = self._save_prices(sym_obj, rows)
+                            self.stdout.write(f"  ✅ {sym_obj.symbol} — {saved} วัน")
+                            success += 1
+                        else:
+                            skipped += 1
+
+                    for s in batch_syms:
+                        if s.symbol not in bars_data:
+                            self.stdout.write(self.style.WARNING(f"  ⏭️ {s.symbol} — ไม่มีข้อมูล"))
+                            skipped += 1
+
+                except Exception as exc:
+                    self.stdout.write(self.style.ERROR(f"  ❌ US Batch error: {exc}"))
+                    failed += len(batch_syms)
+
+                if i + batch_size < len(us_symbols):
+                    time.sleep(0.5)
+
+        # ── SET: ใช้ Yahoo/Stooq เหมือนเดิม ───────────────────────────────
+        if set_symbols:
+            self.stdout.write(f"\n📊 SET stocks ({len(set_symbols)}) — Yahoo/Stooq")
+
         batch_size = options["batch"]
-        for i in range(0, total, batch_size):
-            batch_syms = symbols[i:i + batch_size]
+        for i in range(0, len(set_symbols), batch_size):
+            batch_syms = set_symbols[i:i + batch_size]
             ticker_map = {get_yahoo_ticker(s.symbol, s.exchange): s for s in batch_syms}
             tickers = list(ticker_map.keys())
-            
-            progress = f"[{i+len(batch_syms)}/{total}]"
-            
+
+            progress = f"[{i+len(batch_syms)}/{len(set_symbols)}]"
+
             try:
                 batch_data = fetch_prices_batch(tickers, start_date, end_date)
-                
+
                 for ticker, rows in batch_data.items():
                     sym_obj = ticker_map.get(ticker)
                     if not sym_obj: continue
-                    
+
                     if not rows:
                         skipped += 1
                         continue
-                        
+
                     saved = self._save_prices(sym_obj, rows)
                     self.stdout.write(f"  ✅ {sym_obj.symbol} — {saved} วัน")
                     success += 1
-                
+
                 # ตัวที่ไม่มีข้อมูลใน batch_data
                 for ticker, sym_obj in ticker_map.items():
                     if ticker not in batch_data:
@@ -322,7 +387,7 @@ class Command(BaseCommand):
                 self.stdout.write(self.style.ERROR(f"  ❌ Batch {progress} ล้มเหลว: {exc}"))
                 failed += len(batch_syms)
 
-            if i + batch_size < total:
+            if i + batch_size < len(set_symbols):
                 time.sleep(options["delay"])
 
         # สรุปผล
