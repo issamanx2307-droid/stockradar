@@ -7,6 +7,13 @@ import SymbolInput from "../components/SymbolInput"
 
 const BASE = (import.meta as any).env.VITE_API_URL || "http://127.0.0.1:8000/api"
 
+function authHeaders(): Record<string, string> {
+  const token = localStorage.getItem("sr_token")
+  const h: Record<string, string> = { "Content-Type": "application/json" }
+  if (token) h["Authorization"] = `Token ${token}`
+  return h
+}
+
 type Trade = { id: number; action: string; price: number; quantity: number; trade_date: string; note: string }
 type Item  = {
   item_id: number; symbol: string; symbol_name: string; exchange: string
@@ -210,7 +217,7 @@ export default function Watchlist({ onOpenChart }: { onOpenChart?: (s: string) =
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const res = await fetch(`${BASE}/watchlist/`)
+      const res = await fetch(`${BASE}/watchlist/`, { headers: authHeaders() })
       const d   = await res.json()
       setItems(d.items || [])
       setSummary(d.summary || null)
@@ -250,7 +257,7 @@ export default function Watchlist({ onOpenChart }: { onOpenChart?: (s: string) =
     setAddLoading(true); setAddErr("")
     try {
       const res  = await fetch(`${BASE}/watchlist/add/`, {
-        method: "POST", headers: { "Content-Type": "application/json" },
+        method: "POST", headers: authHeaders(),
         body: JSON.stringify({ symbol: addSymbol.trim().toUpperCase() })
       })
       const d = await res.json()
@@ -262,7 +269,7 @@ export default function Watchlist({ onOpenChart }: { onOpenChart?: (s: string) =
 
   async function handleRemove(itemId: number, sym: string) {
     if (!confirm(`ลบ ${sym} ออกจาก Watchlist?`)) return
-    await fetch(`${BASE}/watchlist/item/${itemId}/`, { method: "DELETE" })
+    await fetch(`${BASE}/watchlist/item/${itemId}/`, { method: "DELETE", headers: authHeaders() })
     await load()
   }
 
@@ -270,7 +277,7 @@ export default function Watchlist({ onOpenChart }: { onOpenChart?: (s: string) =
     const f = tradeForm[itemId] || {}
     if (!f.price || !f.qty) return alert("กรุณากรอกราคาและจำนวน")
     const res = await fetch(`${BASE}/watchlist/item/${itemId}/trade/`, {
-      method: "POST", headers: { "Content-Type": "application/json" },
+      method: "POST", headers: authHeaders(),
       body: JSON.stringify({
         action: f.action || "BUY", price: parseFloat(f.price),
         quantity: parseInt(f.qty), trade_date: f.date || new Date().toISOString().slice(0,10),
@@ -283,7 +290,7 @@ export default function Watchlist({ onOpenChart }: { onOpenChart?: (s: string) =
 
   async function handleDeleteTrade(tradeId: number) {
     if (!confirm("ลบรายการซื้อนี้?")) return
-    await fetch(`${BASE}/watchlist/trade/${tradeId}/`, { method: "DELETE" })
+    await fetch(`${BASE}/watchlist/trade/${tradeId}/`, { method: "DELETE", headers: authHeaders() })
     await load()
   }
 
@@ -291,7 +298,7 @@ export default function Watchlist({ onOpenChart }: { onOpenChart?: (s: string) =
     const f = calcForm[itemId] || {}
     if (!f.price) return
     const res = await fetch(`${BASE}/watchlist/item/${itemId}/calc-sell/`, {
-      method: "POST", headers: { "Content-Type": "application/json" },
+      method: "POST", headers: authHeaders(),
       body: JSON.stringify({ sell_price: parseFloat(f.price), sell_qty: f.qty ? parseInt(f.qty) : undefined })
     })
     const d = await res.json()
@@ -300,7 +307,7 @@ export default function Watchlist({ onOpenChart }: { onOpenChart?: (s: string) =
 
   async function handleUpdateAlert(itemId: number, high: string, low: string) {
     await fetch(`${BASE}/watchlist/item/${itemId}/alert/`, {
-      method: "PATCH", headers: { "Content-Type": "application/json" },
+      method: "PATCH", headers: authHeaders(),
       body: JSON.stringify({ alert_price_high: high || null, alert_price_low: low || null })
     })
     await load()
