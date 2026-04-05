@@ -106,6 +106,32 @@ const PRESET_STRATEGIES: Strategy[] = [
     ],
     signal: "BREAKOUT",
   },
+  {
+    id: "adx_trend",
+    name: "ADX Strong Trend",
+    description: "ADX > 25 (เทรนด์แรง) + DI+ > DI− (ขาขึ้น) + RSI > 50",
+    icon: "📈",
+    color: "var(--green)",
+    conditions: [
+      { id: 1, indicator: "adx14", operator: "gt", target: "value", value: "25", logic: "AND" },
+      { id: 2, indicator: "di_plus", operator: "gt", target: "di_minus", value: "", logic: "AND" },
+      { id: 3, indicator: "rsi", operator: "gt", target: "value", value: "50", logic: "AND" },
+    ],
+    signal: "STRONG_BUY",
+  },
+  {
+    id: "adx_weak_sell",
+    name: "ADX Trend Reversal",
+    description: "ADX > 25 + DI− > DI+ (ขาลง) + RSI < 45",
+    icon: "📉",
+    color: "var(--red)",
+    conditions: [
+      { id: 1, indicator: "adx14", operator: "gt", target: "value", value: "25", logic: "AND" },
+      { id: 2, indicator: "di_minus", operator: "gt", target: "di_plus", value: "", logic: "AND" },
+      { id: 3, indicator: "rsi", operator: "lt", target: "value", value: "45", logic: "AND" },
+    ],
+    signal: "STRONG_SELL",
+  },
 ]
 
 // ─── Indicator / Operator Options ────────────────────────────────────────────
@@ -120,6 +146,10 @@ const INDICATORS = [
   { value: "macd_hist", label: "MACD Histogram", unit: "", hasTarget: false },
   { value: "bb_upper", label: "BB Upper", unit: "฿", hasTarget: false },
   { value: "bb_lower", label: "BB Lower", unit: "฿", hasTarget: false },
+  { value: "atr14", label: "ATR (14)", unit: "", hasTarget: false },
+  { value: "adx14", label: "ADX (14)", unit: "", hasTarget: false },
+  { value: "di_plus", label: "DI+", unit: "", hasTarget: false },
+  { value: "di_minus", label: "DI−", unit: "", hasTarget: false },
   { value: "close", label: "ราคาปิด", unit: "฿", hasTarget: true },
   { value: "volume", label: "Volume", unit: "", hasTarget: true },
   { value: "volume_ratio", label: "Volume / ค่าเฉลี่ย 30วัน", unit: "x", hasTarget: false },
@@ -144,6 +174,8 @@ const TARGETS = [
   { value: "bb_upper", label: "BB Upper" },
   { value: "bb_lower", label: "BB Lower" },
   { value: "vol_avg", label: "Volume เฉลี่ย 30วัน" },
+  { value: "di_plus", label: "DI+" },
+  { value: "di_minus", label: "DI−" },
 ]
 
 const SIGNAL_TYPES = [
