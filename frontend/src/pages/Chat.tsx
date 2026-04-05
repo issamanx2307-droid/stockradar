@@ -136,9 +136,13 @@ export default function Chat({ onRead }: { onRead?: () => void }) {
   const [input, setInput]         = useState("")
   const [sending, setSending]     = useState(false)
   const [loading, setLoading]     = useState(true)
+  const [isAIThinking, setIsAIThinking] = useState(false)
   const bottomRef                 = useRef<HTMLDivElement>(null)
   const messagesRef               = useRef<HTMLDivElement>(null)
   const pollRef                   = useRef<ReturnType<typeof setInterval> | null>(null)
+  const thinkingTimeoutRef        = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const lastAIMsgIdRef            = useRef<number | null>(null)
+  const isThinkingRef             = useRef(false)
   const isAtBottomRef             = useRef(true)
   const prevCountRef              = useRef(0)
 
@@ -154,6 +158,17 @@ export default function Chat({ onRead }: { onRead?: () => void }) {
       const res = await api.chatMessages()
       setMessages(res.messages)
       onRead?.()
+
+      // ตรวจว่ามี AI message ใหม่มาหรือยัง → หยุด thinking indicator
+      const latestAI = [...res.messages].reverse().find(m => m.is_ai_response)
+      if (latestAI) {
+        if (isThinkingRef.current && lastAIMsgIdRef.current !== null && latestAI.id !== lastAIMsgIdRef.current) {
+          setIsAIThinking(false)
+          isThinkingRef.current = false
+          if (thinkingTimeoutRef.current) clearTimeout(thinkingTimeoutRef.current)
+        }
+        lastAIMsgIdRef.current = latestAI.id
+      }
     } catch {
       /* silent */
     } finally {
@@ -164,7 +179,10 @@ export default function Chat({ onRead }: { onRead?: () => void }) {
   useEffect(() => {
     loadMessages()
     pollRef.current = setInterval(loadMessages, 6000)
-    return () => { if (pollRef.current) clearInterval(pollRef.current) }
+    return () => {
+      if (pollRef.current) clearInterval(pollRef.current)
+      if (thinkingTimeoutRef.current) clearTimeout(thinkingTimeoutRef.current)
+    }
   }, [])
 
   useEffect(() => {
@@ -189,6 +207,16 @@ export default function Chat({ onRead }: { onRead?: () => void }) {
       await api.chatSend(text)
       setInput("")
       await loadMessages()
+
+      // เริ่ม thinking indicator — AI กำลังตอบอยู่
+      setIsAIThinking(true)
+      isThinkingRef.current = true
+      if (thinkingTimeoutRef.current) clearTimeout(thinkingTimeoutRef.current)
+      // หยุดอัตโนมัติหลัง 90 วินาที (กรณี AI ไม่ตอบ)
+      thinkingTimeoutRef.current = setTimeout(() => {
+        setIsAIThinking(false)
+        isThinkingRef.current = false
+      }, 90_000)
     } catch {
       /* silent */
     } finally {
@@ -360,6 +388,26 @@ export default function Chat({ onRead }: { onRead?: () => void }) {
               </div>
             </div>
           ))
+        )}
+        {/* AI Thinking indicator */}
+        {isAIThinking && (
+          <div style={{ display: "flex", alignItems: "flex-end", gap: 8 }}>
+            <img src="/ai-avatar.png" alt="AI" style={{ width: 32, height: 32, borderRadius: "50%", objectFit: "cover", border: "2px solid #1565c0", flexShrink: 0 }} />
+            <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+              <span style={{ fontSize: 12, color: "var(--text-muted)", paddingLeft: 4, fontWeight: 600 }}>Radar AI</span>
+              <div style={{
+                padding: "12px 18px",
+                borderRadius: "16px 16px 16px 4px",
+                background: "linear-gradient(135deg,rgba(21,101,192,0.08),rgba(2,136,209,0.06))",
+                border: "1px solid rgba(21,101,192,0.3)",
+                display: "flex", alignItems: "center", gap: 5,
+              }}>
+                <span className="thinking-dot" />
+                <span className="thinking-dot" />
+                <span className="thinking-dot" />
+              </div>
+            </div>
+          </div>
         )}
         <div ref={bottomRef} />
       </div>

@@ -2084,7 +2084,7 @@ def _try_ai_reply(user, admin_user, user_message: str):
 
         for _ in range(MAX_ROUNDS):
             response = client.models.generate_content(
-                model="gemini-2.5-flash",
+                model="gemini-2.0-flash",
                 contents=contents,
                 config=config,
             )
@@ -2152,6 +2152,10 @@ def _try_ai_reply(user, admin_user, user_message: str):
     except Exception as e:
         import logging
         logging.getLogger(__name__).error("AI reply error: %s", e)
+    finally:
+        # ปิด DB connection ของ thread นี้ เพื่อคืน connection pool
+        from django.db import connection as _db_conn
+        _db_conn.close()
 
 
 @api_view(["GET"])

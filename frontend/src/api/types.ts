@@ -132,6 +132,7 @@ export interface ChatMessageInfo {
   sender: string;
   is_mine: boolean;
   is_admin_msg: boolean;
+  is_ai_response: boolean;
   is_read: boolean;
   created_at: string;
 }
