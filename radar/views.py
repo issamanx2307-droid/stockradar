@@ -2092,7 +2092,7 @@ def _try_ai_reply(user, admin_user, user_message: str):
             for attempt in range(2):
                 try:
                     response = client.models.generate_content(
-                        model="gemini-2.0-flash",
+                        model="gemini-2.5-flash",
                         contents=contents,
                         config=config,
                     )
