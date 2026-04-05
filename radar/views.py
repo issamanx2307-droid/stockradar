@@ -1940,10 +1940,12 @@ def _try_ai_reply(user, admin_user, user_message: str):
 
     setting = SiteSetting.get()
     if not setting.ai_chat_enabled:
+        _logger.warning("AI reply skipped: ai_chat_enabled=False")
         return
 
     api_key = getattr(settings, "GOOGLE_AI_API_KEY", "")
     if not api_key:
+        _logger.warning("AI reply skipped: GOOGLE_AI_API_KEY not set")
         return
 
     # Rate limit
@@ -1954,7 +1956,9 @@ def _try_ai_reply(user, admin_user, user_message: str):
         ai_today = ChatMessage.objects.filter(
             receiver=user, is_ai_response=True, created_at__date=today,
         ).count()
+        _logger.info("AI daily usage: user=%s count=%d limit=%d", user.username, ai_today, daily_limit)
         if ai_today >= daily_limit:
+            _logger.warning("AI reply skipped: daily limit reached (%d/%d) for user=%s", ai_today, daily_limit, user.username)
             return
 
     # ดึงประวัติสนทนา (10 ข้อความล่าสุด)
