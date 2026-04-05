@@ -303,6 +303,31 @@ def _handle_get_stock_analysis(symbol: str, days: int = 120) -> dict:
         .values("date", "open", "high", "low", "close", "volume")
     )
     actual_days = len(prices)
+
+    # US stocks: ถ้าข้อมูลใน DB ไม่พอ → ดึงจาก Alpaca real-time
+    if actual_days < 5 and sym.exchange in ("NASDAQ", "NYSE"):
+        try:
+            from radar.alpaca_service import get_bars
+            bars = get_bars(symbol, timeframe="1Day", limit=days)
+            if bars and len(bars) >= 5:
+                prices = []
+                for b in bars:
+                    ts = b.get("t", "")
+                    if not ts:
+                        continue
+                    prices.append({
+                        "date":   date.fromisoformat(ts[:10]),
+                        "open":   float(b["o"]),
+                        "high":   float(b["h"]),
+                        "low":    float(b["l"]),
+                        "close":  float(b["c"]),
+                        "volume": int(b.get("v", 0)),
+                    })
+                prices.sort(key=lambda x: x["date"])
+                actual_days = len(prices)
+        except Exception as e:
+            logger.warning("Alpaca fallback for %s: %s", symbol, e)
+
     if actual_days < 5:
         return {
             "data_available": False,

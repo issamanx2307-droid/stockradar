@@ -23,8 +23,52 @@ class MarketData:
     volume: int
 
 
+def _is_us_symbol(symbol: str) -> bool:
+    """ตรวจว่าเป็นหุ้น US หรือไม่ (ดูจาก DB exchange)"""
+    try:
+        from radar.models import Symbol as SymbolModel
+        sym = SymbolModel.objects.filter(symbol=symbol.upper()).first()
+        return sym and sym.exchange in ("NASDAQ", "NYSE")
+    except Exception:
+        return False
+
+
+def _fetch_ohlcv_alpaca(symbol: str, days: int = 365) -> pd.DataFrame:
+    """ดึง OHLCV จาก Alpaca Data API สำหรับหุ้น US"""
+    try:
+        from radar.alpaca_service import get_bars
+        bars = get_bars(symbol.upper(), timeframe="1Day", limit=days)
+        if not bars:
+            return pd.DataFrame()
+        rows = []
+        for b in bars:
+            ts = b.get("t", "")
+            if not ts:
+                continue
+            rows.append({
+                "date":   date.fromisoformat(ts[:10]),
+                "open":   float(b["o"]),
+                "high":   float(b["h"]),
+                "low":    float(b["l"]),
+                "close":  float(b["c"]),
+                "volume": int(b.get("v", 0)),
+            })
+        if not rows:
+            return pd.DataFrame()
+        df = pd.DataFrame(rows).set_index("date").sort_index()
+        return df[["open", "high", "low", "close", "volume"]].dropna()
+    except Exception as e:
+        logger.error("fetch_ohlcv_alpaca %s: %s", symbol, e)
+        return pd.DataFrame()
+
+
 def fetch_ohlcv(symbol: str, days: int = 365) -> pd.DataFrame:
-    """ดึงข้อมูล OHLCV จาก yfinance"""
+    """ดึงข้อมูล OHLCV — US ใช้ Alpaca, SET ใช้ yfinance"""
+    # US stocks → Alpaca
+    if _is_us_symbol(symbol):
+        return _fetch_ohlcv_alpaca(symbol, days)
+
+    # SET stocks → yfinance (เหมือนเดิม)
     ticker = symbol if symbol.endswith(".BK") else symbol
     end = date.today()
     start = end - timedelta(days=days)
@@ -32,7 +76,6 @@ def fetch_ohlcv(symbol: str, days: int = 365) -> pd.DataFrame:
         df = yf.download(ticker, start=start, end=end,
                          progress=False, auto_adjust=True)
         if df.empty:
-            # ลอง .BK suffix สำหรับหุ้น SET
             df = yf.download(f"{symbol}.BK", start=start, end=end,
                              progress=False, auto_adjust=True)
         if df.empty:
