@@ -2082,12 +2082,24 @@ def _try_ai_reply(user, admin_user, user_message: str):
         MAX_ROUNDS = 5
         pending_order_info = None  # เก็บข้อมูล propose_order ถ้า AI เรียก
 
-        for _ in range(MAX_ROUNDS):
-            response = client.models.generate_content(
-                model="gemini-2.0-flash",
-                contents=contents,
-                config=config,
-            )
+        for round_idx in range(MAX_ROUNDS):
+            # Retry with backoff เมื่อโดน rate limit (429)
+            import time as _time
+            for attempt in range(3):
+                try:
+                    response = client.models.generate_content(
+                        model="gemini-2.0-flash",
+                        contents=contents,
+                        config=config,
+                    )
+                    break  # สำเร็จ — ออกจาก retry loop
+                except Exception as _e:
+                    if "429" in str(_e) and attempt < 2:
+                        wait = (attempt + 1) * 15  # 15s, 30s
+                        _logger.warning("Gemini 429 rate limit — retry in %ds (attempt %d)", wait, attempt + 1)
+                        _time.sleep(wait)
+                    else:
+                        raise
 
             # ตรวจว่า Gemini ขอ tool call ไหม
             candidate = response.candidates[0] if response.candidates else None
