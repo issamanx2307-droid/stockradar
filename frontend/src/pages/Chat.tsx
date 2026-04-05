@@ -161,12 +161,15 @@ export default function Chat({ onRead }: { onRead?: () => void }) {
 
       // ตรวจว่ามี AI message ใหม่มาหรือยัง → หยุด thinking indicator
       const latestAI = [...res.messages].reverse().find(m => m.is_ai_response)
-      if (latestAI) {
-        if (isThinkingRef.current && lastAIMsgIdRef.current !== null && latestAI.id !== lastAIMsgIdRef.current) {
+      if (latestAI && isThinkingRef.current) {
+        // หยุด thinking เมื่อ: เป็น AI msg ใหม่ (id ต่างจากที่เก็บไว้ หรือยังไม่เคยมี AI msg)
+        if (lastAIMsgIdRef.current === null || latestAI.id !== lastAIMsgIdRef.current) {
           setIsAIThinking(false)
           isThinkingRef.current = false
           if (thinkingTimeoutRef.current) clearTimeout(thinkingTimeoutRef.current)
         }
+      }
+      if (latestAI) {
         lastAIMsgIdRef.current = latestAI.id
       }
     } catch {
@@ -206,13 +209,15 @@ export default function Chat({ onRead }: { onRead?: () => void }) {
     try {
       await api.chatSend(text)
       setInput("")
+      // โหลด messages ใหม่ (เพื่อแสดงข้อความที่เพิ่งส่ง + อัปเดต lastAIMsgIdRef)
+      // ปิด thinking ชั่วคราวเพื่อไม่ให้ loadMessages หยุด thinking ก่อนเวลา
+      isThinkingRef.current = false
       await loadMessages()
 
       // เริ่ม thinking indicator — AI กำลังตอบอยู่
       setIsAIThinking(true)
       isThinkingRef.current = true
       if (thinkingTimeoutRef.current) clearTimeout(thinkingTimeoutRef.current)
-      // หยุดอัตโนมัติหลัง 90 วินาที (กรณี AI ไม่ตอบ)
       thinkingTimeoutRef.current = setTimeout(() => {
         setIsAIThinking(false)
         isThinkingRef.current = false
