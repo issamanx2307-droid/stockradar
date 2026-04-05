@@ -2083,7 +2083,7 @@ def _try_ai_reply(user, admin_user, user_message: str):
 
         # ── Function Calling Loop ────────────────────────────────────────────
         contents = list(history)
-        MAX_ROUNDS = 5
+        MAX_ROUNDS = 3
         pending_order_info = None  # เก็บข้อมูล propose_order ถ้า AI เรียก
 
         for round_idx in range(MAX_ROUNDS):
@@ -2099,7 +2099,7 @@ def _try_ai_reply(user, admin_user, user_message: str):
                     break  # สำเร็จ — ออกจาก retry loop
                 except Exception as _e:
                     if "429" in str(_e) and attempt < 2:
-                        wait = (attempt + 1) * 15  # 15s, 30s
+                        wait = 35 if attempt == 0 else 65  # รอข้าม 60s boundary
                         _logger.warning("Gemini 429 rate limit — retry in %ds (attempt %d)", wait, attempt + 1)
                         _time.sleep(wait)
                     else:
