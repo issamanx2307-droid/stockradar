@@ -62,6 +62,10 @@ class Command(BaseCommand):
         # ── ดึงทีละ batch ────────────────────────────────────────────────────
         for i in range(0, total, batch_size):
             batch = symbols[i : i + batch_size]
+            # กรอง symbols ที่ Alpaca ไม่รองรับ (มี dot หรือ dash)
+            batch = [s for s in batch if "." not in s.symbol and "-" not in s.symbol]
+            if not batch:
+                continue
             batch_symbols = [s.symbol for s in batch]
             sym_map = {s.symbol: s for s in batch}
 
