@@ -52,10 +52,28 @@ mkdir -p "$APP_DIR/logs"
 mkdir -p "$APP_DIR/run"
 
 # ═══════════════════════════════════════════════════════════
-# 3. อัปเดต .env — เพิ่ม REDIS_URL
+# 2. อัปเดต .env — ตรวจสอบ DJANGO_SECRET_KEY และ REDIS_URL
 # ═══════════════════════════════════════════════════════════
 echo ""
-echo "🔧 [3/5] อัปเดต .env..."
+echo "🔧 [2/5] อัปเดต .env..."
+
+if [ ! -f "$ENV_FILE" ]; then
+  echo "DJANGO_SECRET_KEY=$(python3 -c 'import secrets; print(secrets.token_urlsafe(50))')" > "$ENV_FILE"
+  echo "DEBUG=False" >> "$ENV_FILE"
+  echo "ALLOWED_HOSTS=127.0.0.1" >> "$ENV_FILE"
+fi
+
+if grep -qE '^DJANGO_SECRET_KEY=.*' "$ENV_FILE"; then
+  if grep -qE '^DJANGO_SECRET_KEY=(|CHANGE_THIS_TO_RANDOM_SECRET_KEY)$' "$ENV_FILE"; then
+    SECRET_KEY=$(python3 -c 'import secrets; print(secrets.token_urlsafe(50))')
+    sed -i "s|^DJANGO_SECRET_KEY=.*|DJANGO_SECRET_KEY=$SECRET_KEY|" "$ENV_FILE"
+    echo "✅ อัปเดต DJANGO_SECRET_KEY ใหม่ใน .env"
+  fi
+else
+  SECRET_KEY=$(python3 -c 'import secrets; print(secrets.token_urlsafe(50))')
+  echo "DJANGO_SECRET_KEY=$SECRET_KEY" >> "$ENV_FILE"
+  echo "✅ สร้าง DJANGO_SECRET_KEY ใหม่ใน .env"
+fi
 
 if grep -q "^REDIS_URL=" "$ENV_FILE"; then
   # แก้บรรทัดที่มีอยู่
