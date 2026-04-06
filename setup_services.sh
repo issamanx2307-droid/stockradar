@@ -43,10 +43,19 @@ systemctl restart redis-server
 echo "✅ Redis รันที่ redis://127.0.0.1:6379/0"
 
 # ═══════════════════════════════════════════════════════════
-# 2. อัปเดต .env — เพิ่ม REDIS_URL
+# 2. สร้างโฟลเดอร์พื้นฐาน
 # ═══════════════════════════════════════════════════════════
 echo ""
-echo "🔧 [2/5] อัปเดต .env..."
+echo "🔧 [2/5] สร้างโฟลเดอร์พื้นฐาน..."
+
+mkdir -p "$APP_DIR/logs"
+mkdir -p "$APP_DIR/run"
+
+# ═══════════════════════════════════════════════════════════
+# 3. อัปเดต .env — เพิ่ม REDIS_URL
+# ═══════════════════════════════════════════════════════════
+echo ""
+echo "🔧 [3/5] อัปเดต .env..."
 
 if grep -q "^REDIS_URL=" "$ENV_FILE"; then
   # แก้บรรทัดที่มีอยู่
@@ -57,10 +66,10 @@ fi
 echo "✅ REDIS_URL=redis://127.0.0.1:6379/0"
 
 # ═══════════════════════════════════════════════════════════
-# 3. สร้าง stockradar.service (Daphne) — อัปเดต
+# 4. สร้าง stockradar.service (Daphne) — อัปเดต
 # ═══════════════════════════════════════════════════════════
 echo ""
-echo "🔧 [3/5] สร้าง stockradar.service (Daphne)..."
+echo "🔧 [4/5] สร้าง stockradar.service (Daphne)..."
 
 cat > /etc/systemd/system/stockradar.service << 'EOF'
 [Unit]
@@ -73,6 +82,7 @@ Type=simple
 User=root
 WorkingDirectory=/opt/stockradar
 EnvironmentFile=/opt/stockradar/.env
+ExecStartPre=/bin/mkdir -p /opt/stockradar/logs
 ExecStart=/opt/stockradar/.venv/bin/daphne \
     -b 127.0.0.1 -p 8000 \
     stockradar.asgi:application
