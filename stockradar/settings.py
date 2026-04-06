@@ -5,6 +5,7 @@
 from pathlib import Path
 import os
 import dj_database_url
+import sys
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -16,6 +17,28 @@ if not _secret:
         raise RuntimeError("DJANGO_SECRET_KEY environment variable must be set in production")
     _secret = "dev-secret-key-change-in-production"
 SECRET_KEY = _secret
+
+# Compatibility shim: Python 3.14 + Django template context copy can raise
+# AttributeError when the test client stores rendered templates. Make the
+# test-time receiver tolerant so an AttributeError doesn't crash tests.
+if sys.version_info >= (3, 14):
+    try:
+        from django.test import client as _dj_test_client
+
+        _orig_store = getattr(_dj_test_client, "store_rendered_templates", None)
+
+        if _orig_store:
+            def _safe_store_rendered_templates(*args, **kwargs):
+                try:
+                    return _orig_store(*args, **kwargs)
+                except AttributeError:
+                    # Skip storing the template context if copying fails (known issue)
+                    return None
+
+            setattr(_dj_test_client, "store_rendered_templates", _safe_store_rendered_templates)
+    except Exception:
+        # Best-effort shim; don't block startup on failures here
+        pass
 
 ALLOWED_HOSTS = os.environ.get(
     "ALLOWED_HOSTS", "localhost,127.0.0.1"
