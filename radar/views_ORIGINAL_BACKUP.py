@@ -12,7 +12,6 @@ from django.db import models
 from django.db.models import Subquery, OuterRef
 from django.utils import timezone
 from rest_framework import generics, filters
-from django.views.decorators.csrf import csrf_exempt
 from rest_framework.decorators import api_view, permission_classes, throttle_classes
 from rest_framework.response import Response
 from rest_framework.permissions import AllowAny
@@ -927,7 +926,6 @@ def watchlist_list(request):
     })
 
 
-@csrf_exempt
 @api_view(["POST"])
 def watchlist_add_item(request):
     """POST /api/watchlist/add/ — เพิ่มหุ้นใน watchlist"""
@@ -2085,26 +2083,27 @@ def _try_ai_reply(user, admin_user, user_message: str):
 
         # ── Function Calling Loop ────────────────────────────────────────────
         contents = list(history)
-        MAX_ROUNDS = 5
+        MAX_ROUNDS = 3
         pending_order_info = None  # เก็บข้อมูล propose_order ถ้า AI เรียก
-        response = None
 
         for round_idx in range(MAX_ROUNDS):
-            import time as _time
-            for attempt in range(2):
-                try:
-                    response = client.models.generate_content(
-                        model="gemini-2.5-flash",
-                        contents=contents,
-                        config=config,
+            try:
+                response = client.models.generate_content(
+                    model="gemini-2.0-flash",
+                    contents=contents,
+                    config=config,
+                )
+            except Exception as _e:
+                if "429" in str(_e):
+                    _logger.warning("Gemini 429 rate limit for user=%s", user.username)
+                    ChatMessage.objects.create(
+                        sender=admin_user,
+                        receiver=user,
+                        body="⚠️ ระบบ AI ยุ่งอยู่ในขณะนี้ กรุณาลองส่งข้อความใหม่อีกครั้งใน 1 นาทีนะครับ",
+                        is_ai_response=True,
                     )
-                    break
-                except Exception as _e:
-                    if "429" in str(_e) and attempt < 1:
-                        _logger.warning("Gemini 429 — retry in 10s")
-                        _time.sleep(10)
-                    else:
-                        raise
+                    return
+                raise
 
             # ตรวจว่า Gemini ขอ tool call ไหม
             candidate = response.candidates[0] if response.candidates else None
@@ -2123,7 +2122,7 @@ def _try_ai_reply(user, admin_user, user_message: str):
             # Execute tools แล้วส่งผลกลับ Gemini
             tool_response_parts = []
             for fc in function_calls:
-                _logger.info("AI tool call round=%d: %s(%s)", round_idx, fc.name, dict(fc.args))
+                _logger.info("AI tool call: %s(%s)", fc.name, dict(fc.args))
                 result = handle_tool_call(fc.name, dict(fc.args), user)
                 # ตรวจจับ propose_order — เก็บข้อมูลสำหรับ embed ใน ChatMessage
                 if fc.name == "propose_order" and result.get("__propose_order__"):
@@ -2150,27 +2149,10 @@ def _try_ai_reply(user, admin_user, user_message: str):
             ]
         # ────────────────────────────────────────────────────────────────────
 
-        # ดึง text จาก response อย่างปลอดภัย
-        # response.text raises ValueError ถ้าไม่มี text parts
-        ai_text = ""
-        if response:
-            try:
-                ai_text = (response.text or "").strip()
-            except (ValueError, AttributeError):
-                # Gemini ตอบเป็น function call อย่างเดียว ไม่มี text
-                # ลองดึง text จาก parts โดยตรง
-                try:
-                    cand = response.candidates[0] if response.candidates else None
-                    if cand and cand.content and cand.content.parts:
-                        text_parts = [
-                            p.text for p in cand.content.parts
-                            if hasattr(p, "text") and p.text
-                        ]
-                        ai_text = "\n".join(text_parts).strip()
-                except Exception:
-                    pass
-
+        ai_text = (response.text or "").strip()
         if ai_text:
+            # ถ้า AI เรียก propose_order → embed order info ท้ายข้อความ
+            # Frontend จะ parse และแสดง confirm card
             body = ai_text
             if pending_order_info:
                 import json as _json
@@ -2182,30 +2164,10 @@ def _try_ai_reply(user, admin_user, user_message: str):
                 body=body,
                 is_ai_response=True,
             )
-        else:
-            # AI ไม่สามารถสร้าง text response ได้ — ส่งข้อความแจ้ง user
-            _logger.warning("AI reply empty for user=%s", user.username)
-            ChatMessage.objects.create(
-                sender=admin_user,
-                receiver=user,
-                body="⚠️ ขออภัยครับ ระบบ AI ไม่สามารถประมวลผลได้ในขณะนี้ กรุณาลองส่งข้อความใหม่อีกครั้งครับ",
-                is_ai_response=True,
-            )
 
     except Exception as e:
         import logging
-        logger = logging.getLogger(__name__)
-        logger.error("AI reply error for user=%s: %s", user.username, e, exc_info=True)
-        # ส่งข้อความแจ้ง user ว่า AI มีปัญหา — ไม่ทิ้งให้ thinking indicator ค้าง
-        try:
-            ChatMessage.objects.create(
-                sender=admin_user,
-                receiver=user,
-                body="⚠️ ขออภัยครับ ระบบ AI ขัดข้อง กรุณาลองส่งข้อความใหม่อีกครั้งครับ",
-                is_ai_response=True,
-            )
-        except Exception:
-            pass
+        logging.getLogger(__name__).error("AI reply error: %s", e)
     finally:
         # ปิด DB connection ของ thread นี้ เพื่อคืน connection pool
         from django.db import connection as _db_conn
