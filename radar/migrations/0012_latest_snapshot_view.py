@@ -9,7 +9,23 @@ View นี้ join ข้อมูลล่าสุดจาก 4 ตารา
 
 Refresh: python manage.py refresh_snapshot
 """
-from django.db import migrations
+from django.db import migrations, connection
+
+
+def _is_postgres():
+    return connection.vendor == "postgresql"
+
+
+def create_view(apps, schema_editor):
+    if not _is_postgres():
+        return   # SQLite (test env) ไม่รองรับ MATERIALIZED VIEW
+    schema_editor.execute(CREATE_VIEW)
+
+
+def drop_view(apps, schema_editor):
+    if not _is_postgres():
+        return
+    schema_editor.execute(DROP_VIEW)
 
 
 CREATE_VIEW = """
@@ -105,8 +121,5 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        migrations.RunSQL(
-            sql=CREATE_VIEW,
-            reverse_sql=DROP_VIEW,
-        ),
+        migrations.RunPython(create_view, reverse_code=drop_view),
     ]
