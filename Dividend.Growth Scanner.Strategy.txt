@@ -1,0 +1,97 @@
+Dividend + Growth Scanner Strategy 
+ 
+Architecture
+data_pipeline/
+    fundamentals.py
+    price_data.py
+
+scanner/
+    dividend_growth_scanner.py
+
+scoring/
+    scoring_engine.py
+
+api/
+    scanner_api.py
+
+Metrics
+Dividend
+*	dividend_yield ? 3% 
+*	payout_ratio ? 60% 
+*	dividend_growth_5y ? 5% 
+?? Growth
+*	revenue_growth_5y ? 5% 
+*	eps_growth_5y ? 7% 
+?? Quality
+*	ROE ? 12% 
+*	debt_to_equity ? 1.5 
+?? Valuation
+*	PE < industry_avg 
+*	หรือ PE < 25 
+Scoring Model
+def calculate_score(stock):
+    score = 0
+
+    # Dividend (30)
+    score += min(stock.dividend_yield * 5, 15)
+    score += min(stock.dividend_growth_5y * 2, 15)
+
+    # Growth (30)
+    score += min(stock.revenue_growth_5y * 2, 15)
+    score += min(stock.eps_growth_5y * 2, 15)
+
+    # Quality (20)
+    if stock.roe > 15:
+        score += 10
+    if stock.debt_to_equity < 1:
+        score += 10
+
+    # Valuation (20)
+    if stock.pe < 20:
+        score += 10
+    if stock.pe < stock.industry_pe:
+        score += 10
+
+    return score
+Scanner Logic 
+def scan(stocks):
+    results = []
+
+    for s in stocks:
+        if (
+            s.dividend_yield >= 0.03 and
+            s.eps_growth_5y >= 0.05 and
+            s.roe >= 0.12
+        ):
+            score = calculate_score(s)
+            results.append((s.ticker, score))
+
+    return sorted(results, key=lambda x: x[1], reverse=True) 
+ 
+API
+# /api/scanner/dividend-growth
+
+GET /api/scanner/dividend-growth?min_score=70
+
+Response:
+[
+  {
+    "ticker": "AAPL",
+    "score": 82,
+    "dividend_yield": 0.005,
+    "eps_growth": 0.12,
+    "roe": 0.45
+  }
+]
+"Dividend Safety Score"
+if payout_ratio < 50 and free_cash_flow > 0: 
+    safety = "SAFE"
+"Dividend Trap Detector"
+ตัดหุ้นแบบ:
+*	yield สูง แต่ earnings ไม่โต 
+*	payout > 80%
+*	
+*	Total Return Estimate (โคตรสำคัญ)
+*	expected_return = dividend_yield + eps_growth
+
+
