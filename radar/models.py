@@ -862,7 +862,7 @@ class SiteSetting(models.Model):
     ai_chat_enabled = models.BooleanField(
         default=False,
         verbose_name="เปิดใช้ AI ในแชท",
-        help_text="เมื่อเปิด ระบบจะตอบแชทผู้ใช้โดยอัตโนมัติด้วย Claude AI",
+        help_text="เมื่อเปิด ระบบจะตอบแชทผู้ใช้โดยอัตโนมัติด้วย Gemini AI",
     )
 
     class Meta:
