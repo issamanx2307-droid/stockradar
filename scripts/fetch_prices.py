@@ -1,10 +1,13 @@
 """
-GitHub Actions — ดึงราคาหุ้นจาก Stooq (หลัก) และ Yahoo Finance batch (fallback)
-แล้วส่งไปยัง VPS
+GitHub Actions — ดึงราคาหุ้น
+  Thai stocks  : Stooq (หลัก) → Yahoo Finance batch (fallback)
+  US stocks    : Alpaca Data API (ใช้ credentials เดิมที่มีอยู่แล้ว)
 
 Environment variables (GitHub Secrets):
-    VPS_API_URL   = https://radarhoon.com
-    VPS_API_TOKEN = <IMPORT_API_TOKEN ใน .env ของ VPS>
+    VPS_API_URL       = https://radarhoon.com
+    VPS_API_TOKEN     = <IMPORT_API_TOKEN ใน .env ของ VPS>
+    ALPACA_API_KEY    = <Alpaca API Key>
+    ALPACA_SECRET_KEY = <Alpaca Secret Key>
 
 Usage:
     python scripts/fetch_prices.py          # ดึง 7 วันล่าสุด
@@ -21,8 +24,11 @@ from datetime import date, timedelta
 import pandas as pd
 import requests
 
-VPS_API_URL   = os.environ.get("VPS_API_URL", "").strip().rstrip("/")
-VPS_API_TOKEN = os.environ.get("VPS_API_TOKEN", "").strip()
+VPS_API_URL       = os.environ.get("VPS_API_URL", "").strip().rstrip("/")
+VPS_API_TOKEN     = os.environ.get("VPS_API_TOKEN", "").strip()
+ALPACA_API_KEY    = os.environ.get("ALPACA_API_KEY", "").strip()
+ALPACA_SECRET_KEY = os.environ.get("ALPACA_SECRET_KEY", "").strip()
+ALPACA_DATA_URL   = "https://data.alpaca.markets"
 
 BATCH_SIZE        = 200
 SLEEP_TICKER      = 0.3   # delay หลังแต่ละ ticker (Stooq)
@@ -179,6 +185,82 @@ def fetch_batch_yahoo(sym_map: dict[str, str], start: date, end: date) -> dict[s
     return result
 
 
+def fetch_us_stocks_alpaca(symbols: list[str], start: date, end: date) -> dict[str, list[dict]]:
+    """
+    ดึง OHLCV bars ของ US stocks จาก Alpaca Data API (multi-symbol, pagination)
+    คืน dict: { "AAPL": [rows], "TSLA": [rows], ... }
+    แต่ละ row มี keys: date, open, high, low, close, volume, symbol
+    """
+    if not ALPACA_API_KEY or not ALPACA_SECRET_KEY:
+        print("  ⚠ ไม่พบ ALPACA_API_KEY / ALPACA_SECRET_KEY — ข้าม US stocks")
+        return {}
+
+    headers = {
+        "APCA-API-KEY-ID":     ALPACA_API_KEY,
+        "APCA-API-SECRET-KEY": ALPACA_SECRET_KEY,
+    }
+    ALPACA_BATCH = 100  # symbols per request (Alpaca แนะนำ ≤ 100)
+    result: dict[str, list[dict]] = {}
+
+    for batch_start in range(0, len(symbols), ALPACA_BATCH):
+        batch = symbols[batch_start : batch_start + ALPACA_BATCH]
+        params = {
+            "symbols":   ",".join(batch),
+            "timeframe": "1Day",
+            "start":     start.isoformat(),
+            "end":       end.isoformat(),
+            "limit":     1000,
+            "feed":      "iex",   # iex = ฟรี, sip = ต้องจ่ายแต่ครบกว่า
+            "sort":      "asc",
+        }
+        page_token = None
+
+        for attempt in range(MAX_RETRIES):
+            try:
+                while True:
+                    if page_token:
+                        params["page_token"] = page_token
+                    r = requests.get(
+                        f"{ALPACA_DATA_URL}/v2/stocks/bars",
+                        headers=headers,
+                        params=params,
+                        timeout=30,
+                    )
+                    r.raise_for_status()
+                    data = r.json()
+
+                    for sym, bars in data.get("bars", {}).items():
+                        if sym not in result:
+                            result[sym] = []
+                        for b in bars:
+                            ts = b.get("t", "")[:10]  # "2024-01-02T00:00:00Z" → "2024-01-02"
+                            result[sym].append({
+                                "date":   ts,
+                                "open":   round(float(b.get("o", 0)), 4),
+                                "high":   round(float(b.get("h", 0)), 4),
+                                "low":    round(float(b.get("l", 0)), 4),
+                                "close":  round(float(b.get("c", 0)), 4),
+                                "volume": int(b.get("v", 0)),
+                            })
+
+                    page_token = data.get("next_page_token")
+                    if not page_token:
+                        break
+                break  # batch สำเร็จ
+            except Exception as e:
+                if attempt < MAX_RETRIES - 1:
+                    wait = 5 * (attempt + 1)
+                    print(f"  ⚠ Alpaca retry {attempt+1} (wait {wait}s): {e}")
+                    time.sleep(wait)
+                else:
+                    print(f"  ✗ Alpaca batch ล้มเหลว: {e}")
+
+        if batch_start + ALPACA_BATCH < len(symbols):
+            time.sleep(1)  # หน่วงระหว่าง batch เพื่อไม่โดน rate limit
+
+    return result
+
+
 def send_to_vps(records: list[dict]) -> tuple[int, int]:
     """ส่งข้อมูลราคาเข้า VPS เป็น batch"""
     imported = skipped = 0
@@ -300,15 +382,15 @@ def main():
         yahoo_thai_ok = yahoo_thai_fail = 0
 
     # ══════════════════════════════════════════
-    # Phase 3: Yahoo batch → US stocks (ทั้งหมด)
+    # Phase 3: Alpaca → US stocks (ทั้งหมด)
     # ══════════════════════════════════════════
     us_ok = us_fail = 0
     if us_syms:
-        print(f"\n📥 Phase 3: Yahoo batch (US {len(us_syms)} ตัว)...")
-        sym_map = {sym: yah for sym, yah in us_syms}
-        batch_result = fetch_batch_yahoo(sym_map, start, end)
+        us_symbol_list = [sym for sym, _yahoo in us_syms]
+        print(f"\n📥 Phase 3: Alpaca Data API (US {len(us_symbol_list)} ตัว)...")
+        alpaca_result = fetch_us_stocks_alpaca(us_symbol_list, start, end)
 
-        for symbol, rows in batch_result.items():
+        for symbol, rows in alpaca_result.items():
             if rows:
                 for row in rows:
                     row["symbol"] = symbol
@@ -316,9 +398,13 @@ def main():
                 us_ok += 1
             else:
                 us_fail += 1
-                print(f"  ✗ ไม่ได้ข้อมูล: {symbol}")
 
-        print(f"  Yahoo US: ✅{us_ok}  ❌{us_fail}")
+        # แจ้ง symbol ที่ไม่มีข้อมูล (Alpaca อาจไม่รองรับ OTC หรือ delisted)
+        missing_us = [sym for sym, _ in us_syms if sym not in alpaca_result or not alpaca_result.get(sym)]
+        if missing_us:
+            print(f"  ⚠ ไม่มีข้อมูลจาก Alpaca ({len(missing_us)} ตัว): {', '.join(missing_us[:10])}{'...' if len(missing_us) > 10 else ''}")
+
+        print(f"  Alpaca US: ✅{us_ok}  ❌{us_fail}")
 
     # ── สรุป ──
     total_ok   = stooq_ok + yahoo_thai_ok + us_ok

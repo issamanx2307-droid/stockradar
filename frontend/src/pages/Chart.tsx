@@ -175,7 +175,7 @@ export default function Chart({ symbol: initSymbol }: { symbol?: string | null }
       if (macdRef2.current && ia.length > 0) {
         const macdLine   = toLine(ia, "macd")
         const signalLine = toLine(ia, "macd_signal")
-        const histData   = ia.filter(i => i.macd_hist != null).map(i => ({
+        const histData   = ia.filter((i: any) => i.macd_hist != null).map((i: any) => ({
           time:  i.date,
           value: parseFloat(i.macd_hist),
           color: parseFloat(i.macd_hist) >= 0 ? "rgba(0,230,118,.7)" : "rgba(255,82,82,.7)",
@@ -223,12 +223,12 @@ export default function Chart({ symbol: initSymbol }: { symbol?: string | null }
         volChart.current = createChart(volRef.current, {
           ...CHART_OPTS(100), width: w,
           timeScale: { visible: false },
-          rightPriceScale: { borderColor:"#1e2d42", scaleMarginTop:0.1, scaleMarginBottom:0 },
+          rightPriceScale: { borderColor:"#1e2d42", scaleMargins: { top: 0.1, bottom: 0 } },
         })
         series.current.vol = volChart.current.addSeries(HistogramSeries, {
           priceFormat: { type:"volume" }, priceScaleId:"volume",
         })
-        volChart.current.priceScale("volume").applyOptions({ scaleMarginTop:0.1, scaleMarginBottom:0 })
+        volChart.current.priceScale("volume").applyOptions({ scaleMargins: { top: 0.1, bottom: 0 } })
       }
 
       // MACD chart
@@ -244,12 +244,19 @@ export default function Chart({ symbol: initSymbol }: { symbol?: string | null }
       }
 
       // Sync crosshair between all charts
+      const s = series.current
+      const chartSeriesMap = new Map<IChartApi, ISeriesApi<any>>()
+      if (mainChart.current && s.candle) chartSeriesMap.set(mainChart.current, s.candle)
+      if (volChart.current && s.vol) chartSeriesMap.set(volChart.current, s.vol)
+      if (macdChart.current && s.macdHist) chartSeriesMap.set(macdChart.current, s.macdHist)
+
       const syncCross = (src: IChartApi, targets: IChartApi[]) => {
         src.subscribeCrosshairMove(p => {
           const t = (p.time as any)
           targets.forEach(tc => {
-            if (t) tc.setCrossHairPosition(p.point?.x ?? 0, p.point?.y ?? 0, tc.series?.()[0])
-            else tc.clearCrossHairPosition()
+            const targetSeries = chartSeriesMap.get(tc)
+            if (t && targetSeries) tc.setCrosshairPosition(p.point?.y ?? 0, t, targetSeries)
+            else tc.clearCrosshairPosition()
           })
         })
       }

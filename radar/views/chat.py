@@ -214,6 +214,14 @@ def _try_ai_reply(user, admin_user, user_message: str):
 
     except Exception as e:
         _logger.error("AI reply error: %s", e)
+        try:
+            ChatMessage.objects.create(
+                sender=admin_user, receiver=user,
+                body="⚠️ ระบบ AI เกิดข้อผิดพลาด กรุณาลองส่งข้อความใหม่อีกครั้งครับ",
+                is_ai_response=True,
+            )
+        except Exception:
+            _logger.error("Failed to send AI error message to user")
     finally:
         from django.db import connection as _db_conn
         _db_conn.close()

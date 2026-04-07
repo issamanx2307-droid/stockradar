@@ -33,15 +33,19 @@ jobs:
       - name: Fetch & send prices (daily)
         if: github.event_name == 'schedule'
         env:
-          VPS_API_URL:   ${{ secrets.VPS_API_URL }}
-          VPS_API_TOKEN: ${{ secrets.VPS_API_TOKEN }}
+          VPS_API_URL:       ${{ secrets.VPS_API_URL }}
+          VPS_API_TOKEN:     ${{ secrets.VPS_API_TOKEN }}
+          ALPACA_API_KEY:    ${{ secrets.ALPACA_API_KEY }}
+          ALPACA_SECRET_KEY: ${{ secrets.ALPACA_SECRET_KEY }}
         run: python scripts/fetch_prices.py --days 7
 
       - name: Fetch & send prices (manual)
         if: github.event_name == 'workflow_dispatch'
         env:
-          VPS_API_URL:   ${{ secrets.VPS_API_URL }}
-          VPS_API_TOKEN: ${{ secrets.VPS_API_TOKEN }}
+          VPS_API_URL:       ${{ secrets.VPS_API_URL }}
+          VPS_API_TOKEN:     ${{ secrets.VPS_API_TOKEN }}
+          ALPACA_API_KEY:    ${{ secrets.ALPACA_API_KEY }}
+          ALPACA_SECRET_KEY: ${{ secrets.ALPACA_SECRET_KEY }}
         run: python scripts/fetch_prices.py --days ${{ github.event.inputs.days }}
 
       - name: Trigger engine + news on VPS

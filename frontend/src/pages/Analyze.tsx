@@ -81,7 +81,7 @@ export default function Analyze({ onOpenChart, initialSymbol }: {
                 onChange={e => setCapital(Number(e.target.value))}
                 style={{ width: "100%", fontFamily: "var(--font-mono)" }} />
             </div>
-            <button className="btn btn-primary" onClick={handleAnalyze}
+            <button className="btn btn-primary" onClick={() => handleAnalyze()}
               disabled={loading} style={{ height: 38, minWidth: 120 }}>
               {loading ? "⏳ กำลังวิเคราะห์..." : "🔬 วิเคราะห์"}
             </button>

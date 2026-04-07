@@ -15,6 +15,7 @@ admin.site.index_title = "จัดการระบบ"
 
 urlpatterns = [
     path("mantapa/", admin.site.urls),
+    path("api/", include("radar.urls")),
     path("api/v1/", include("radar.urls")),
     path("engine/", include("engine_api.urls")),
     # Auth — Google OAuth + Me + Logout
