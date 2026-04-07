@@ -106,4 +106,14 @@ export const api = {
     apiFetch(`/alpaca/orders/${orderId}/confirm/`, { method: "POST", body: JSON.stringify({}) }),
   alpacaCancelOrder: (orderId: number): Promise<any> =>
     apiFetch(`/alpaca/orders/${orderId}/cancel/`, { method: "POST", body: JSON.stringify({}) }),
+  alpacaAccount: (): Promise<any> =>
+    apiFetch("/alpaca/account/"),
+  alpacaPositions: (): Promise<any[]> =>
+    apiFetch("/alpaca/positions/"),
+  alpacaOrders: (status = "all", limit = 20): Promise<any[]> =>
+    apiFetch(`/alpaca/orders/?status=${status}&limit=${limit}`),
+  alpacaPortfolioHistory: (period = "1M", timeframe = "1D"): Promise<any> =>
+    apiFetch(`/alpaca/portfolio/?period=${period}&timeframe=${timeframe}`),
+  alpacaClock: (): Promise<any> =>
+    apiFetch("/alpaca/clock/"),
 }

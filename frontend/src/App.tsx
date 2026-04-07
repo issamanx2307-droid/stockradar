@@ -23,6 +23,7 @@ import VIScreen from "./pages/VIScreen"
 import MultiLayerScanner from "./pages/MultiLayerScanner"
 import Chat from "./pages/Chat"
 import Subscription from "./pages/Subscription"
+import USPortfolio from "./pages/USPortfolio"
 import { AutoTermHighlight, TermAssistantProvider, TermAssistantToggle } from "./components/TermAssistant"
 import TickerTape from "./components/TickerTape"
 import "./App.css"
@@ -43,6 +44,7 @@ const USER_NAV: { id: string; label: string; icon: string }[] = [
   { id: "chart",        label: "กราฟ",               icon: "📈" },
   { id: "strategy",     label: "กลยุทธ์",             icon: "🎯" },
   { id: "backtest",     label: "Backtest",            icon: "⏪" },
+  { id: "us_portfolio", label: "US Portfolio",        icon: "🇺🇸" },
   { id: "guide",        label: "คำแนะนำ & ถาม-ตอบ",  icon: "💡" },
   { id: "profile",      label: "บัญชี & สมาชิก",     icon: "⚙️" },
   { id: "contact",      label: "ติดต่อเรา",          icon: "📞" },
@@ -56,7 +58,7 @@ function AppInner() {
   const VALID_PAGES = [
     "dashboard","engine_scan","watchlist","news","analyze","fundamental",
     "vi_screen","multi_layer","scanner","chart","strategy","backtest",
-    "guide","profile","contact","subscription","chat",
+    "guide","profile","contact","subscription","chat","us_portfolio",
   ]
   function getHashPage(fallback: string) {
     const h = window.location.hash.replace("#", "")
@@ -258,6 +260,7 @@ function AppInner() {
             {page === "profile"      && <Profile />}
             {page === "contact"      && <Contact />}
             {page === "chat"         && <Chat onRead={() => setChatUnread(0)} />}
+            {page === "us_portfolio" && <USPortfolio />}
             {page === "subscription" && <Subscription />}
           </AutoTermHighlight>
         </main>
