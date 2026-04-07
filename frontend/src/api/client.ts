@@ -109,9 +109,9 @@ export const api = {
   alpacaAccount: (): Promise<any> =>
     apiFetch("/alpaca/account/"),
   alpacaPositions: (): Promise<any[]> =>
-    apiFetch("/alpaca/positions/"),
+    apiFetch("/alpaca/positions/").then((r: any) => r.positions ?? r ?? []),
   alpacaOrders: (status = "all", limit = 20): Promise<any[]> =>
-    apiFetch(`/alpaca/orders/?status=${status}&limit=${limit}`),
+    apiFetch(`/alpaca/orders/?status=${status}&limit=${limit}`).then((r: any) => r.orders ?? r ?? []),
   alpacaPortfolioHistory: (period = "1M", timeframe = "1D"): Promise<any> =>
     apiFetch(`/alpaca/portfolio/?period=${period}&timeframe=${timeframe}`),
   alpacaClock: (): Promise<any> =>
