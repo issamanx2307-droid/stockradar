@@ -7,9 +7,14 @@ import { API_BASE } from "./config"
 const BASE = API_BASE.replace("/api", "")
 const ENGINE = `${BASE}/engine`
 
+function getAuthHeader(): Record<string, string> {
+  const token = localStorage.getItem("sr_token")
+  return token ? { Authorization: `Token ${token}` } : {}
+}
+
 async function engineFetch<T>(path: string, options: RequestInit = {}): Promise<T> {
   const res = await fetch(`${ENGINE}${path}`, {
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...getAuthHeader() },
     ...options,
   })
   if (!res.ok) throw new Error(`Engine API ${res.status}: ${path}`)
